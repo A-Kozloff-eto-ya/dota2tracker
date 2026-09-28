@@ -1,0 +1,120 @@
+﻿@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #0a0d12;
+  --foreground: #e8e3d6;
+  --card: #10151d;
+  --card-foreground: #e8e3d6;
+  --popover: #141a24;
+  --popover-foreground: #e8e3d6;
+  --primary: #c8402c;
+  --primary-foreground: #fff3ec;
+  --secondary: #1b2330;
+  --secondary-foreground: #ccd4e0;
+  --muted: #161c27;
+  --muted-foreground: #9099a9;
+  --accent: #202a3a;
+  --accent-foreground: #f0ebdd;
+  --destructive: #e5484d;
+  --destructive-foreground: #ffffff;
+  --border: #232c3b;
+  --input: #232c3b;
+  --ring: #c8402c;
+  --chart-1: #c8402c;
+  --chart-2: #59a75a;
+  --chart-3: #d4af37;
+  --chart-4: #4a7fb5;
+  --chart-5: #9d6cd3;
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Палитра Dota 2 */
+  --color-dire: #c8402c;
+  --color-dire-bright: #ef6b52;
+  --color-radiant: #4f9d54;
+  --color-radiant-bright: #79c973;
+  --color-gold: #d4af37;
+  --color-gold-bright: #f2d06b;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Russo One", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  /* Полупрозрачное «стекло» для карточек и шапки */
+  .glass {
+    background: color-mix(in srgb, var(--card) 78%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  /* Золотой градиентный текст для рейтингов */
+  .text-gold-gradient {
+    background-image: linear-gradient(100deg, #f7e08a 0%, #d4af37 45%, #f2d06b 80%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #2a3444;
+    border-radius: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #3a475c;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
