@@ -3,7 +3,8 @@
 // ISteamUser/ResolveVanityURL. Всё остальное — STRATZ.
 //
 // У Steam Web API нет CORS-заголовков, поэтому запрос идёт через прокси
-// /steamapi (в dev — vite.config.ts, в проде — аналог на хостинге).
+// /steamapi: в dev — vite.config.ts, на Vercel — rewrite из vercel.json.
+// Ключ Steam берётся из окружения сборки (VITE_STEAM_API_KEY).
 
 import { accountFromSteam64 } from '@/lib/playerInput'
 import { getSteamApiKey } from '@/lib/storage'
@@ -38,7 +39,7 @@ export async function resolveVanityAccountId(vanity: string): Promise<number | n
     )
   } catch {
     throw new SteamError(
-      'Не удалось обратиться к Steam Web API — проверьте, что прокси /steamapi доступен',
+      'Не удалось обратиться к Steam Web API — проверьте, что прокси /steamapi настроен',
     )
   }
 
@@ -56,3 +57,5 @@ export async function resolveVanityAccountId(vanity: string): Promise<number | n
   }
   return accountFromSteam64(response.steamid)
 }
+
+

@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/steamapi/:path*",
+      "destination": "https://api.steampowered.com/:path*"
+    }
+  ]
+}
