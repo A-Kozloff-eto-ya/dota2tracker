@@ -44,6 +44,15 @@ export interface RecentMatch {
   playerSlot: number
   gameMode: number
   leaverStatus: number
+  position?: Role | null
+  lane?: string | null
+  role?: string | null
+  roleBasic?: string | null
+  isVictory?: boolean | null
+  denies?: number
+  networth?: number | null
+  level?: number | null
+  imp?: number | null
 }
 
 export interface PlayerStats {

@@ -23,6 +23,7 @@ import type {
   PlayerStats,
   RatingConfig,
   RecentMatch,
+  Role,
   TrackedPlayer,
 } from '@/types'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,7 @@ interface PlayerDetailDialogProps {
   config: RatingConfig
   open: boolean
   onOpenChange: (open: boolean) => void
+  roleFilter?: Role | null
 }
 
 /** Полный профиль игрока: сводка, история матчей, топ героев, разбор рейтинга */
@@ -44,10 +46,11 @@ export function PlayerDetailDialog({
   config,
   open,
   onOpenChange,
+  roleFilter = null,
 }: PlayerDetailDialogProps) {
   const evaluation = useMemo(
-    () => evaluatePlayer(stats, config),
-    [stats, config],
+    () => evaluatePlayer(stats, config, roleFilter),
+    [stats, config, roleFilter],
   )
   const medal = medalFromRankTier(stats?.profile.rankTier ?? null)
   const profile = stats?.profile
@@ -57,8 +60,10 @@ export function PlayerDetailDialog({
     stats != null && totalGames === 0 && stats.recentMatches.length === 0
 
   const matches = useMemo(
-    () => [...(stats?.recentMatches ?? [])].sort((a, b) => b.startTime - a.startTime),
-    [stats],
+    () => [...(stats?.recentMatches ?? [])]
+      .filter((match) => roleFilter == null || match.position === roleFilter)
+      .sort((a, b) => b.startTime - a.startTime),
+    [roleFilter, stats],
   )
 
   return (
@@ -102,7 +107,7 @@ export function PlayerDetailDialog({
                 {profile?.leaderboardRank != null && (
                   <span>Лидерборд: топ {fmtInt(profile.leaderboardRank)}</span>
                 )}
-                {stats && <span>Матчей: {fmtInt(totalGames)}</span>}
+                {stats && <span>{roleFilter == null ? 'Матчей' : 'Ролевых матчей'}: {fmtInt(roleFilter == null ? totalGames : matches.length)}</span>}
                 {stats?.behaviorScore != null && (
                   <span>Behavior: {fmtInt(stats.behaviorScore)}</span>
                 )}

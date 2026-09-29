@@ -11,6 +11,7 @@ import type {
   HeroInfo,
   RatedPlayer,
   RatingConfig,
+  Role,
 } from '@/types'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -31,16 +32,17 @@ interface PlayerCardProps {
   onRemove: (accountId: number) => void
   onRefresh: (accountId: number) => void
   canManage: boolean
+  roleFilter?: Role | null
 }
 
-export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canManage }: PlayerCardProps) {
+export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canManage, roleFilter = null }: PlayerCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const { player, status, error, fetchedAt } = rated
   const stats = rated.stats
   const evaluation = useMemo(
-    () => evaluatePlayer(stats, config),
-    [stats, config],
+    () => evaluatePlayer(stats, config, roleFilter),
+    [stats, config, roleFilter],
   )
   const medal = medalFromRankTier(stats?.profile.rankTier ?? null)
   const profile = stats?.profile
@@ -291,6 +293,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canMana
         player={player}
         stats={stats}
         config={config}
+        roleFilter={roleFilter}
         heroes={heroes}
         open={detailOpen}
         onOpenChange={setDetailOpen}

@@ -9,6 +9,7 @@ import type {
   PlayerStats,
   RecentMatch,
   SearchEntry,
+  Role,
 } from '@/types'
 
 const MATCHES_TAKE = 50
@@ -189,6 +190,15 @@ interface StratzPlayerResponse {
       heroDamage?: number | null
       heroHealing?: number | null
       towerDamage?: number | null
+      position?: string | null
+      isVictory?: boolean | null
+      numDenies?: number | null
+      networth?: number | null
+      level?: number | null
+      imp?: number | null
+      lane?: string | null
+      role?: string | null
+      roleBasic?: string | null
       leaverStatus?: string | null
     }> | null
   }> | null
@@ -212,6 +222,12 @@ function mapLeaverStatus(value: unknown): number {
   if (typeof value === 'string') return LEAVER_STATUS_BY_ENUM[value] ?? 0
   if (typeof value === 'number') return value
   return 0
+}
+
+function mapPosition(value: unknown): Role | null {
+  if (typeof value !== 'string') return null
+  const match = /^POSITION_([1-5])$/.exec(value)
+  return match ? (Number(match[1]) as Role) : null
 }
 
 const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!) {
@@ -240,6 +256,15 @@ const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!) {
         heroDamage
         heroHealing
         towerDamage
+        position
+        lane
+        role
+        roleBasic
+        isVictory
+        numDenies
+        networth
+        level
+        imp
         leaverStatus
       }
     }
@@ -305,6 +330,15 @@ export async function fetchPlayerStatsStratz(
         towerDamage: pm?.towerDamage ?? 0,
         lastHits: pm?.numLastHits ?? 0,
         radiantWin: m.didRadiantWin === true,
+        position: mapPosition(pm?.position),
+        lane: pm?.lane ?? null,
+        role: pm?.role ?? null,
+        roleBasic: pm?.roleBasic ?? null,
+        isVictory: pm?.isVictory ?? null,
+        denies: pm?.numDenies ?? 0,
+        networth: pm?.networth ?? null,
+        level: pm?.level ?? null,
+        imp: pm?.imp ?? null,
         // Семантика слота: radiant 0..4, dire 128..132 (важно для формулы)
         playerSlot: pm?.isRadiant ? 0 : 128,
         gameMode: 0,

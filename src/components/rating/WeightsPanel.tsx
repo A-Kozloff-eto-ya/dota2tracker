@@ -16,8 +16,9 @@ import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
 import { fmtDecimal, fmtInt } from '@/lib/format'
 import { medalFromRankTier } from '@/lib/medals'
-import { PLAYER_ROLE_LABELS } from '@/lib/playerRoles'
-import type { PlayerRole, RatedPlayer, RatingConfig } from '@/types'
+import { POSITION_LABELS } from '@/lib/playerRoles'
+import { evaluatePlayer } from '@/lib/rating'
+import type { RatedPlayer, RatingConfig, Role } from '@/types'
 
 interface WeightsPanelProps {
   config: RatingConfig
@@ -253,37 +254,38 @@ export function WeightsPanel({ config, onChange, onReset, rated }: WeightsPanelP
           )}
         </CardContent>
       </Card>
-      <RoleBenchmarks rated={rated} />
+      <RoleBenchmarks rated={rated} config={config} />
     </div>
   )
 }
 
-const BENCHMARK_ROLES: PlayerRole[] = ['carry', 'mid', 'offlane', 'soft_support', 'hard_support']
+const BENCHMARK_ROLES: Role[] = [1, 2, 3, 4, 5]
 
-function RoleBenchmarks({ rated }: { rated: RatedPlayer[] }) {
+function RoleBenchmarks({ rated, config }: { rated: RatedPlayer[]; config: RatingConfig }) {
   return (
     <Card className="glass lg:col-span-2">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Ролевые эталоны</CardTitle>
         <CardDescription>
-          Лучшие загруженные игроки вашего пула по каждому игровому тегу
+          Лучшие загруженные показатели вашего пула по фактическим матчам на позиции
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {BENCHMARK_ROLES.map((role) => {
             const benchmark = rated
-              .filter((item) => item.player.roles.includes(role) && item.evaluation?.rating != null)
+              .map((item) => ({ item, evaluation: evaluatePlayer(item.stats, config, role) }))
+              .filter(({ item, evaluation }) => item.stats?.recentMatches.some((match) => match.position === role) && evaluation?.rating != null)
               .sort((a, b) => (b.evaluation?.rating ?? -1) - (a.evaluation?.rating ?? -1))[0]
             const perf = benchmark?.evaluation?.perf
 
             return (
               <div key={role} className="min-w-0 border border-border/70 bg-card/50 p-3">
-                <div className="tlabel mb-2">{PLAYER_ROLE_LABELS[role]}</div>
+                <div className="tlabel mb-2">{POSITION_LABELS[role]}</div>
                 {benchmark ? (
                   <>
-                    <div className="truncate text-sm font-medium" title={benchmark.player.personaname}>
-                      {benchmark.player.personaname}
+                    <div className="truncate text-sm font-medium" title={benchmark.item.player.personaname}>
+                      {benchmark.item.player.personaname}
                     </div>
                     <div className="mt-1 text-lg font-semibold tabular-nums text-primary">
                       {fmtInt(benchmark.evaluation?.rating ?? null)}

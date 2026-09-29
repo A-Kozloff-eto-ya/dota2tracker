@@ -11,6 +11,7 @@ import type {
   PlayerEvaluation,
   PlayerStats,
   RatingConfig,
+  Role,
 } from '@/types'
 
 export const DEFAULT_RATING_CONFIG: RatingConfig = {
@@ -57,12 +58,13 @@ export function tierScoreOf(stats: PlayerStats): number | null {
 }
 
 /** PerfScore: агрегаты по последним матчам */
-export function perfOf(stats: PlayerStats, config: RatingConfig): PerfDetails {
+export function perfOf(stats: PlayerStats, config: RatingConfig, position?: Role | null): PerfDetails {
   const matches = stats.recentMatches
     // Исключаем ливеров: учитываем только матчи, где игрок доиграл
     // (0 NONE / 1 DISCONNECTED), отбрасывая DISCONNECTED_TOO_LONG,
     // ABANDONED, AFK и NEVER_CONNECTED.
     .filter((m) => m.leaverStatus < 2)
+    .filter((m) => position == null || m.position === position)
     .slice(0, config.recentMatchesCount)
 
   if (matches.length === 0) {
@@ -86,7 +88,7 @@ export function perfOf(stats: PlayerStats, config: RatingConfig): PerfDetails {
     damage += m.heroDamage
     duration += m.duration
     const isRadiant = (m.playerSlot & 0x80) === 0
-    if (m.radiantWin === isRadiant) wins += 1
+    if (m.isVictory ?? (m.radiantWin === isRadiant)) wins += 1
   }
 
   const kda = (kills + assists) / Math.max(1, deaths)
@@ -150,11 +152,12 @@ const PERF_WEIGHTS = { kda: 0.3, gpm: 0.25, xpm: 0.15, dpm: 0.15, winrate: 0.15 
 export function evaluatePlayer(
   stats: PlayerStats | null,
   config: RatingConfig,
+  position?: Role | null,
 ): PlayerEvaluation | null {
   if (!stats) return null
 
   const tier = tierScoreOf(stats)
-  const perf = perfOf(stats, config)
+  const perf = perfOf(stats, config, position)
   const perfScore =
     perf.sampleSize > 0 && perf.kdaScore != null
       ? round1(
