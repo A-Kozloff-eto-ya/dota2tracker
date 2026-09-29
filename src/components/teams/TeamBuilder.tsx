@@ -165,7 +165,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                 <div
                   key={accountId}
                   className={cn(
-                    'flex flex-wrap items-center gap-2 border px-2 py-2 transition-colors sm:gap-3 sm:px-3',
+                    'flex flex-wrap items-center gap-2 border px-2 py-2 transition-colors sm:flex-nowrap sm:gap-3 sm:px-3',
                     isSelected ? 'border-primary/50 bg-primary/5' : 'border-border/70',
                   )}
                 >

@@ -55,7 +55,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canMana
     <>
       <Card className="glass border-x-0 border-b border-t-0 py-5 transition-colors hover:border-primary/40">
       <CardHeader className="pb-3">
-        <div className="flex min-h-[4.5rem] items-stretch gap-2 sm:gap-3">
+        <div className="flex min-h-[4.5rem] items-stretch gap-2 sm:h-[4.5rem] sm:min-h-0 sm:gap-3">
           <button
             type="button"
             onClick={() => setDetailOpen(true)}
@@ -117,7 +117,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canMana
               )}
             </div>
           </button>
-          <div className="flex shrink-0 flex-col justify-center text-right">
+          <div className="flex flex-col justify-center text-right sm:shrink-0">
             <RatingBadge rating={evaluation?.rating ?? null} size="lg" />
             <div className="mt-1 text-[10px] text-muted-foreground">
               {timeAgo(fetchedAt)}
