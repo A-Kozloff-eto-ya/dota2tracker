@@ -30,11 +30,27 @@ export default async function handler(request: VercelRequest, response: VercelRe
         'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
       },
       body: JSON.stringify({ query: body.query, variables: body.variables ?? {} }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(25000),
     })
-    const result = await stratzResponse.json()
+
+    const text = await stratzResponse.text()
+    let result: unknown
+    try {
+      result = JSON.parse(text)
+    } catch {
+      console.error('STRATZ returned a non-JSON response', {
+        status: stratzResponse.status,
+        contentType: stratzResponse.headers.get('content-type'),
+        body: text.slice(0, 300),
+      })
+      json(response, 502, { error: `STRATZ returned an invalid response (${stratzResponse.status})` })
+      return
+    }
+
     json(response, stratzResponse.status, result)
-  } catch {
-    json(response, 502, { error: 'Could not reach STRATZ API' })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('STRATZ request failed', message)
+    json(response, 502, { error: `Could not reach STRATZ API: ${message}` })
   }
 }
