@@ -92,6 +92,70 @@ export interface RatingThresholds {
   heroPool: number
 }
 
+/** Как считается эталонная величина показателя в пуле */
+export type BenchmarkMode = 'p50' | 'p75' | 'p90' | 'best'
+
+export interface BenchmarkSettings {
+  mode: BenchmarkMode
+  /** Мин. число матчей на позиции внутри окна, чтобы игрок попал в расчёт эталона */
+  minMatches: number
+  /** 0 — ранг не учитывается; иначе эталон задают игроки, чья медаль
+   *  не ниже топ-медали роли минус rankGap ступеней (1 Herald … 8 Immortal) */
+  rankGap: number
+}
+
+/** Пороги формы, производные от эталонов пула */
+export interface BenchmarkThresholds {
+  kda: number
+  gpm: number
+  xpm: number
+  dpm: number
+}
+
+/** Агрегат метрик по матчам (общая математика формы и эталонов) */
+export interface MatchesAggregate {
+  count: number
+  kda: number
+  goldPerMin: number
+  xpPerMin: number
+  damagePerMin: number
+  winrate: number
+  imp: number | null
+  lastHitsPerMin: number
+}
+
+export interface BenchmarkMetrics {
+  kda: number | null
+  gpm: number | null
+  xpm: number | null
+  dpm: number | null
+  /** Средний IMP (impact) по матчам на позиции */
+  imp: number | null
+  /** Ластхиты в минуту */
+  lhpm: number | null
+}
+
+export interface RoleBenchmark {
+  /** Позиция (null — агрегат по всем позициям) */
+  role: Role | null
+  /** Сколько игроков квалифицировано (≥ minMatches матчей на позиции, в ранг-охвате) */
+  players: number
+  /** Суммарно матчей на позиции у квалифицированных игроков */
+  matches: number
+  /** Лучший rank_tier среди учтённых игроков — медаль, задающая планку */
+  topRankTier: number | null
+  metrics: BenchmarkMetrics
+  /** Пороги для относительного скоринга (null — мало данных) */
+  thresholds: BenchmarkThresholds | null
+}
+
+export interface PoolBenchmarks {
+  byRole: Record<Role, RoleBenchmark>
+  overall: RoleBenchmark
+}
+
+export type ScoringSource = 'fixed' | 'pool'
+
 export interface RatingConfig {
   /** Веса компонент формулы (нормализуются автоматически) */
   weights: { tier: number; perf: number; activity: number }
@@ -99,7 +163,13 @@ export interface RatingConfig {
   scaleMax: number
   /** Сколько последних матчей брать для оценки формы */
   recentMatchesCount: number
+  /** Окно актуальности матчей для формы и эталонов в месяцах
+   *  (0 — весь период загрузки). Матчи старше окна не учитываются. */
+  recencyMonths: number
   thresholds: RatingThresholds
+  /** Пороги формы: фиксированные значения или эталоны пула */
+  scoring: ScoringSource
+  benchmark: BenchmarkSettings
 }
 
 export interface PerfDetails {
@@ -133,6 +203,11 @@ export interface PlayerEvaluation {
   activityScore: number | null
   /** Вклад каждой компоненты в итоговый рейтинг (в очках шкалы) */
   contributions: { tier: number | null; perf: number | null; activity: number | null }
+  /** Какими порогами скорилась форма: фиксированными или эталонами пула */
+  thresholdsSource: ScoringSource
+  /** Свежих матчей в окне меньше benchmark.minMatches (профиль не приватный) —
+   *  рейтинг обнулён: без достаточной формы медаль не котируется */
+  inactive: boolean
   perf: PerfDetails
   activity: ActivityDetails
 }

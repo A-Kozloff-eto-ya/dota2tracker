@@ -36,7 +36,11 @@ async function stratzQuery<T>(
   })
 
   if (res.status === 401 || res.status === 403) {
-    throw new StratzError('STRATZ отклонил серверный ключ — проверьте настройки Vercel')
+    const json = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new StratzError(
+      json?.error ??
+        'STRATZ вернул 403 — ключ отклонён или превышен лимит (максимум 2 IP за 15 минут)',
+    )
   }
   if (res.status === 429) {
     throw new StratzError('Превышен лимит запросов STRATZ — подождите немного')

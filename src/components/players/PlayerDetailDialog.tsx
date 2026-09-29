@@ -21,6 +21,7 @@ import { medalFromRankTier } from '@/lib/medals'
 import type {
   HeroInfo,
   PlayerStats,
+  PoolBenchmarks,
   RatingConfig,
   RecentMatch,
   Role,
@@ -33,6 +34,7 @@ interface PlayerDetailDialogProps {
   stats: PlayerStats | null
   heroes: Map<number, HeroInfo>
   config: RatingConfig
+  benchmarks: PoolBenchmarks
   open: boolean
   onOpenChange: (open: boolean) => void
   roleFilter?: Role | null
@@ -44,13 +46,14 @@ export function PlayerDetailDialog({
   stats,
   heroes,
   config,
+  benchmarks,
   open,
   onOpenChange,
   roleFilter = null,
 }: PlayerDetailDialogProps) {
   const evaluation = useMemo(
-    () => evaluatePlayer(stats, config, roleFilter),
-    [stats, config, roleFilter],
+    () => evaluatePlayer(stats, config, roleFilter, benchmarks),
+    [stats, config, roleFilter, benchmarks],
   )
   const medal = medalFromRankTier(stats?.profile.rankTier ?? null)
   const profile = stats?.profile

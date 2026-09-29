@@ -1,16 +1,17 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { PlayerCard } from '@/components/players/PlayerCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { POSITION_LABELS } from '@/lib/playerRoles'
-import { evaluatePlayer } from '@/lib/rating'
-import type { HeroInfo, RatedPlayer, RatingConfig, Role } from '@/types'
+import { evaluatePlayer, positionMatches } from '@/lib/rating'
+import type { HeroInfo, PoolBenchmarks, RatedPlayer, RatingConfig, Role } from '@/types'
 
 interface PlayerListProps {
   rated: RatedPlayer[]
   heroes: Map<number, HeroInfo>
   config: RatingConfig
+  benchmarks: PoolBenchmarks
   statsPeriodMonths: number
   onStatsPeriodChange: (months: number) => void
   onRemove: (accountId: number) => void
@@ -18,8 +19,33 @@ interface PlayerListProps {
   canManage: boolean
 }
 
-export function PlayerList({ rated, heroes, config, statsPeriodMonths, onStatsPeriodChange, onRemove, onRefresh, canManage }: PlayerListProps) {
+export function PlayerList({ rated, heroes, config, benchmarks, statsPeriodMonths, onStatsPeriodChange, onRemove, onRefresh, canManage }: PlayerListProps) {
   const [roleFilter, setRoleFilter] = useState<Role | null>(null)
+
+  const filtered = useMemo(
+    () =>
+      roleFilter == null
+        ? rated
+        : rated.filter((item) =>
+            item.stats != null &&
+            positionMatches(item.stats.recentMatches, roleFilter, config.recencyMonths).length >=
+              config.benchmark.minMatches,
+          ),
+    [rated, roleFilter, config.recencyMonths, config.benchmark.minMatches],
+  )
+  const sorted = useMemo(
+    () =>
+      filtered
+        .map((item) => ({
+          item,
+          evaluation:
+            roleFilter == null
+              ? item.evaluation
+              : evaluatePlayer(item.stats, config, roleFilter, benchmarks),
+        }))
+        .sort((a, b) => (b.evaluation?.rating ?? -1) - (a.evaluation?.rating ?? -1)),
+    [filtered, roleFilter, config, benchmarks],
+  )
 
   if (rated.length === 0) {
     return (
@@ -32,16 +58,6 @@ export function PlayerList({ rated, heroes, config, statsPeriodMonths, onStatsPe
       </Alert>
     )
   }
-
-  const filtered = roleFilter == null
-    ? rated
-    : rated.filter((item) => item.stats?.recentMatches.some((match) => match.position === roleFilter))
-  const sorted = filtered
-    .map((item) => ({
-      item,
-      evaluation: roleFilter == null ? item.evaluation : evaluatePlayer(item.stats, config, roleFilter),
-    }))
-    .sort((a, b) => (b.evaluation?.rating ?? -1) - (a.evaluation?.rating ?? -1))
 
   return (
     <div>
@@ -89,6 +105,7 @@ export function PlayerList({ rated, heroes, config, statsPeriodMonths, onStatsPe
           rated={{ ...item, evaluation }}
           heroes={heroes}
           config={config}
+          benchmarks={benchmarks}
           onRemove={onRemove}
           onRefresh={onRefresh}
           canManage={canManage}
@@ -97,7 +114,8 @@ export function PlayerList({ rated, heroes, config, statsPeriodMonths, onStatsPe
       ))}
       {sorted.length === 0 && (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          Нет матчей с подтвержденной позицией {roleFilter != null ? POSITION_LABELS[roleFilter] : ''}.
+          Нет игроков с ≥ {config.benchmark.minMatches} матчами на позиции{' '}
+          {roleFilter != null ? POSITION_LABELS[roleFilter] : ''} за окно актуальности.
         </p>
       )}
       </div>

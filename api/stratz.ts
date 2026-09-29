@@ -43,7 +43,9 @@ export default async function handler(request: VercelRequest, response: VercelRe
         contentType: stratzResponse.headers.get('content-type'),
         body: text.slice(0, 300),
       })
-      json(response, 502, { error: `STRATZ returned an invalid response (${stratzResponse.status})` })
+      json(response, 502, {
+        error: `STRATZ returned an invalid response (${stratzResponse.status}): ${text.slice(0, 200)}`,
+      })
       return
     }
 

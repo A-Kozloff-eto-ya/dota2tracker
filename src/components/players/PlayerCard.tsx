@@ -1,14 +1,14 @@
 import { ChevronDown, Eye, Loader2, RefreshCw, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
 import { HeroImage } from '@/components/players/HeroImage'
 import { PlayerDetailDialog } from '@/components/players/PlayerDetailDialog'
 import { RatingBadge } from '@/components/rating/RatingBadge'
 import { RatingBreakdown } from '@/components/rating/RatingBreakdown'
-import { evaluatePlayer } from '@/lib/rating'
 import type {
   HeroInfo,
+  PoolBenchmarks,
   RatedPlayer,
   RatingConfig,
   Role,
@@ -29,21 +29,19 @@ interface PlayerCardProps {
   rated: RatedPlayer
   heroes: Map<number, HeroInfo>
   config: RatingConfig
+  benchmarks: PoolBenchmarks
   onRemove: (accountId: number) => void
   onRefresh: (accountId: number) => void
   canManage: boolean
   roleFilter?: Role | null
 }
 
-export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canManage, roleFilter = null }: PlayerCardProps) {
+export function PlayerCard({ rated, heroes, config, benchmarks, onRemove, onRefresh, canManage, roleFilter = null }: PlayerCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const { player, status, error, fetchedAt } = rated
   const stats = rated.stats
-  const evaluation = useMemo(
-    () => evaluatePlayer(stats, config, roleFilter),
-    [stats, config, roleFilter],
-  )
+  const evaluation = rated.evaluation
   const medal = medalFromRankTier(stats?.profile.rankTier ?? null)
   const profile = stats?.profile
   const totalGames = stats ? stats.wl.win + stats.wl.lose : 0
@@ -115,6 +113,15 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canMana
               {isPrivate && (
                 <Badge variant="outline" className="text-[10px]">
                   скрытый профиль
+                </Badge>
+              )}
+              {evaluation?.inactive && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px]"
+                  title={`Меньше ${config.benchmark.minMatches} матчей за окно (${config.recencyMonths} мес.) — рейтинг не рассчитан`}
+                >
+                  не активен
                 </Badge>
               )}
             </div>
@@ -293,6 +300,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canMana
         player={player}
         stats={stats}
         config={config}
+        benchmarks={benchmarks}
         roleFilter={roleFilter}
         heroes={heroes}
         open={detailOpen}

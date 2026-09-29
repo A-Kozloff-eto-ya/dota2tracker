@@ -7,10 +7,14 @@
 
 import type {
   ActivityDetails,
+  BenchmarkThresholds,
+  MatchesAggregate,
   PerfDetails,
   PlayerEvaluation,
   PlayerStats,
+  PoolBenchmarks,
   RatingConfig,
+  RecentMatch,
   Role,
 } from '@/types'
 
@@ -26,19 +30,79 @@ export const DEFAULT_RATING_CONFIG: RatingConfig = {
     sampleGames: 400,
     heroPool: 30,
   },
+  scoring: 'pool',
+  benchmark: { mode: 'p75', minMatches: 3, rankGap: 2 },
+  recencyMonths: 3,
 }
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 const toScore = (value: number, good: number) => clamp01(value / good) * 100
 const round1 = (x: number) => Math.round(x * 10) / 10
 
+/** Номер медали из rank_tier: 1 Herald … 8 Immortal (null — без медали) */
+export function medalTierOf(rankTier: number | null | undefined): number | null {
+  if (rankTier == null || rankTier <= 0) return null
+  return Math.min(8, Math.max(1, Math.floor(rankTier / 10)))
+}
+
+/** Матчи для оценки формы и эталонов: без ливеров, при позиции — только на ней,
+ * и не старше окна актуальности (recencyMonths, 0 — без ограничения). */
+export function positionMatches(
+  matches: RecentMatch[],
+  position?: Role | null,
+  recencyMonths = 0,
+  nowMs = Date.now(),
+): RecentMatch[] {
+  const cutoffMs =
+    recencyMonths > 0 ? nowMs - recencyMonths * 30 * 24 * 60 * 60 * 1000 : 0
+  return matches
+    // Исключаем ливеров: учитываем только матчи, где игрок доиграл
+    // (0 NONE / 1 DISCONNECTED), отбрасывая DISCONNECTED_TOO_LONG,
+    // ABANDONED, AFK и NEVER_CONNECTED.
+    .filter((m) => m.leaverStatus < 2)
+    .filter((m) => position == null || m.position === position)
+    .filter((m) => m.startTime * 1000 >= cutoffMs)
+}
+
+/** Агрегация метрик по набору матчей — общая для «формы» и эталонов пула */
+export function aggregateMatches(matches: RecentMatch[]): MatchesAggregate | null {
+  if (matches.length === 0) return null
+
+  let kills = 0, deaths = 0, assists = 0, gold = 0, xp = 0, damage = 0, duration = 0, wins = 0, lastHits = 0
+  const imps: number[] = []
+  for (const m of matches) {
+    kills += m.kills
+    deaths += m.deaths
+    assists += m.assists
+    gold += m.goldPerMin
+    xp += m.xpPerMin
+    damage += m.heroDamage
+    duration += m.duration
+    lastHits += m.lastHits
+    if (m.imp != null) imps.push(m.imp)
+    const isRadiant = (m.playerSlot & 0x80) === 0
+    if (m.isVictory ?? (m.radiantWin === isRadiant)) wins += 1
+  }
+
+  return {
+    count: matches.length,
+    kda: (kills + assists) / Math.max(1, deaths),
+    goldPerMin: gold / matches.length,
+    xpPerMin: xp / matches.length,
+    damagePerMin: duration > 0 ? (damage / duration) * 60 : 0,
+    winrate: wins / matches.length,
+    imp: imps.length > 0 ? imps.reduce((sum, v) => sum + v, 0) / imps.length : null,
+    lastHitsPerMin: duration > 0 ? (lastHits / duration) * 60 : 0,
+  }
+}
+
 /** TierScore: публичная медаль (rank_tier) + бонус лидерборда */
 export function tierScoreOf(stats: PlayerStats): number | null {
   const { rankTier, leaderboardRank } = stats.profile
   let score: number | null = null
 
-  if (rankTier != null && rankTier > 0) {
-    const tier = Math.min(8, Math.max(1, Math.floor(rankTier / 10)))
+  const tier = medalTierOf(rankTier)
+  if (tier != null && rankTier != null) {
     const stars = Math.min(5, Math.max(0, rankTier % 10))
     if (tier >= 8) {
       // Immortal: базовые 88 очков, дальше усиливается бонусом лидерборда
@@ -57,17 +121,19 @@ export function tierScoreOf(stats: PlayerStats): number | null {
   return score == null ? null : round1(score)
 }
 
-/** PerfScore: агрегаты по последним матчам */
-export function perfOf(stats: PlayerStats, config: RatingConfig, position?: Role | null): PerfDetails {
-  const matches = stats.recentMatches
-    // Исключаем ливеров: учитываем только матчи, где игрок доиграл
-    // (0 NONE / 1 DISCONNECTED), отбрасывая DISCONNECTED_TOO_LONG,
-    // ABANDONED, AFK и NEVER_CONNECTED.
-    .filter((m) => m.leaverStatus < 2)
-    .filter((m) => position == null || m.position === position)
+/** PerfScore: агрегаты по последним матчам.
+ * `poolThresholds` — пороги из эталонов пула (перекрывают фиксированные). */
+export function perfOf(
+  stats: PlayerStats,
+  config: RatingConfig,
+  position?: Role | null,
+  poolThresholds?: BenchmarkThresholds | null,
+): PerfDetails {
+  const matches = positionMatches(stats.recentMatches, position, config.recencyMonths)
     .slice(0, config.recentMatchesCount)
+  const agg = aggregateMatches(matches)
 
-  if (matches.length === 0) {
+  if (!agg) {
     return {
       kda: null, kdaScore: null,
       gpm: null, gpmScore: null,
@@ -78,38 +144,19 @@ export function perfOf(stats: PlayerStats, config: RatingConfig, position?: Role
     }
   }
 
-  let kills = 0, deaths = 0, assists = 0, gold = 0, xp = 0, damage = 0, duration = 0, wins = 0
-  for (const m of matches) {
-    kills += m.kills
-    deaths += m.deaths
-    assists += m.assists
-    gold += m.goldPerMin
-    xp += m.xpPerMin
-    damage += m.heroDamage
-    duration += m.duration
-    const isRadiant = (m.playerSlot & 0x80) === 0
-    if (m.isVictory ?? (m.radiantWin === isRadiant)) wins += 1
-  }
-
-  const kda = (kills + assists) / Math.max(1, deaths)
-  const gpm = gold / matches.length
-  const xpm = xp / matches.length
-  const dpm = duration > 0 ? (damage / duration) * 60 : 0
-  const winrate = wins / matches.length
-
-  const th = config.thresholds
+  const th = { ...config.thresholds, ...(poolThresholds ?? {}) }
   return {
-    kda: round1(kda),
-    kdaScore: round1(toScore(kda, th.kda)),
-    gpm: Math.round(gpm),
-    gpmScore: round1(toScore(gpm, th.gpm)),
-    xpm: Math.round(xpm),
-    xpmScore: round1(toScore(xpm, th.xpm)),
-    dpm: Math.round(dpm),
-    dpmScore: round1(toScore(dpm, th.dpm)),
-    recentWinrate: winrate,
-    recentWinrateScore: round1(winrate * 100),
-    sampleSize: matches.length,
+    kda: round1(agg.kda),
+    kdaScore: round1(toScore(agg.kda, th.kda)),
+    gpm: Math.round(agg.goldPerMin),
+    gpmScore: round1(toScore(agg.goldPerMin, th.gpm)),
+    xpm: Math.round(agg.xpPerMin),
+    xpmScore: round1(toScore(agg.xpPerMin, th.xpm)),
+    dpm: Math.round(agg.damagePerMin),
+    dpmScore: round1(toScore(agg.damagePerMin, th.dpm)),
+    recentWinrate: agg.winrate,
+    recentWinrateScore: round1(agg.winrate * 100),
+    sampleSize: agg.count,
   }
 }
 
@@ -148,16 +195,36 @@ export function activityOf(stats: PlayerStats, config: RatingConfig): ActivityDe
 
 const PERF_WEIGHTS = { kda: 0.3, gpm: 0.25, xpm: 0.15, dpm: 0.15, winrate: 0.15 } as const
 
-/** Полный расчёт рейтинга игрока */
+/** Полный расчёт рейтинга игрока.
+ * `benchmarks` — эталоны пула: при scoring: 'pool' пороги формы берутся
+ * из эталона позиции (или общие, если позиция не выбрана). */
 export function evaluatePlayer(
   stats: PlayerStats | null,
   config: RatingConfig,
   position?: Role | null,
+  benchmarks?: PoolBenchmarks | null,
 ): PlayerEvaluation | null {
   if (!stats) return null
 
+  // Мин. свежих матчей для рейтинга (тот же порог, что у эталонов): игрок
+  // должен играть в окне, иначе медаль и lifetime-винрейт тащат
+  // «титана на пенсии» в топ на паре случайных матчей.
+  const totalGames = stats.wl.win + stats.wl.lose
+  const isPrivate = totalGames === 0 && stats.recentMatches.length === 0
+  const recentCount = positionMatches(
+    stats.recentMatches,
+    position,
+    config.recencyMonths,
+  ).length
+  const inactive = !isPrivate && recentCount < config.benchmark.minMatches
+
+  const poolBench = config.scoring === 'pool' && benchmarks
+    ? (position != null ? benchmarks.byRole[position] : benchmarks.overall)
+    : null
+  const poolThresholds = poolBench?.thresholds ?? null
+
   const tier = tierScoreOf(stats)
-  const perf = perfOf(stats, config, position)
+  const perf = perfOf(stats, config, position, poolThresholds)
   const perfScore =
     perf.sampleSize > 0 && perf.kdaScore != null
       ? round1(
@@ -192,7 +259,7 @@ export function evaluatePlayer(
   }
 
   let rating: number | null = null
-  if (available.length > 0) {
+  if (available.length > 0 && !inactive) {
     const weightSum = available.reduce((sum, p) => sum + p.weight, 0)
     const base =
       available.reduce((sum, p) => sum + (p.score as number) * p.weight, 0) / weightSum
@@ -204,5 +271,15 @@ export function evaluatePlayer(
     }
   }
 
-  return { rating, tierScore: tier, perfScore, activityScore, contributions, perf, activity }
+  return {
+    rating,
+    tierScore: tier,
+    perfScore,
+    activityScore,
+    contributions,
+    thresholdsSource: poolThresholds ? 'pool' : 'fixed',
+    inactive,
+    perf,
+    activity,
+  }
 }

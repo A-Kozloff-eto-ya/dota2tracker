@@ -16,6 +16,7 @@ import { usePlayers } from '@/hooks/usePlayers'
 import { useRatingConfig } from '@/hooks/useRatingConfig'
 import { useAuth } from '@/hooks/useAuth'
 import { evaluatePlayer } from '@/lib/rating'
+import { computeBenchmarks } from '@/lib/benchmark'
 import type { RatedPlayer } from '@/types'
 
 export default function App() {
@@ -47,6 +48,20 @@ export default function App() {
     window.localStorage.setItem('dota2tracker-theme', theme)
   }, [theme])
 
+  const benchmarkPlayers = useMemo(
+    () =>
+      tracked.map((player) => ({
+        accountId: player.accountId,
+        personaname: player.personaname,
+        stats: statsMap[player.accountId]?.stats ?? null,
+      })),
+    [tracked, statsMap],
+  )
+  const benchmarks = useMemo(
+    () => computeBenchmarks(benchmarkPlayers, config),
+    [benchmarkPlayers, config],
+  )
+
   const rated = useMemo<RatedPlayer[]>(
     () =>
       tracked.map((player) => {
@@ -58,10 +73,10 @@ export default function App() {
           status: statusMap[player.accountId] ?? (entry ? 'loaded' : 'idle'),
           error: errorMap[player.accountId] ?? null,
           fetchedAt: entry?.fetchedAt ?? null,
-          evaluation: evaluatePlayer(stats, config),
+          evaluation: evaluatePlayer(stats, config, null, benchmarks),
         }
       }),
-    [tracked, statsMap, statusMap, errorMap, config],
+    [tracked, statsMap, statusMap, errorMap, config, benchmarks],
   )
 
   return (
@@ -104,6 +119,7 @@ export default function App() {
                 rated={rated}
                 heroes={heroes}
                 config={config}
+                benchmarks={benchmarks}
                 statsPeriodMonths={statsPeriodMonths}
                 onStatsPeriodChange={setStatsPeriodMonths}
                 onRemove={removePlayer}
@@ -123,6 +139,7 @@ export default function App() {
                 onChange={setConfig}
                 onReset={resetConfig}
                 rated={rated}
+                benchmarks={benchmarks}
               />
             </TabsContent>
             <TabsContent value="teams">

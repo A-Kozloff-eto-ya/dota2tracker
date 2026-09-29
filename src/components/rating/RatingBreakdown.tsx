@@ -36,7 +36,7 @@ export function RatingBreakdown({ evaluation, config }: RatingBreakdownProps) {
       score: perfScore,
       weight: config.weights.perf,
       contribution: contributions.perf,
-      hint: `KDA, GPM, XPM, урон в минуту, винрейт — последние ${perf.sampleSize || config.recentMatchesCount} матчей`,
+      hint: `KDA, GPM, XPM, урон в минуту, винрейт — последние ${perf.sampleSize || config.recentMatchesCount} матчей${config.recencyMonths > 0 ? ` не старше ${config.recencyMonths} мес.` : ' за весь период'}`,
     },
     {
       key: 'activity' as const,
@@ -85,9 +85,20 @@ export function RatingBreakdown({ evaluation, config }: RatingBreakdownProps) {
             </div>
           </div>
         ))}
+        {evaluation.inactive && (
+          <p className="rounded-lg border border-dashed border-border p-3 text-xs leading-relaxed text-muted-foreground">
+            Свежих матчей в окне меньше {config.benchmark.minMatches} — рейтинг не
+            рассчитывается: без достаточной формы медаль и общий винрейт не котируются.
+          </p>
+        )}
         <p className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
           Рейтинг = Σ(вес × компонента) / Σвес, пересчитанный в шкалу 0–
           {fmtInt(config.scaleMax)}. Доступные компоненты автоматически забирают вес недоступных.
+          Форма скорится по{' '}
+          {evaluation.thresholdsSource === 'pool'
+            ? `эталонам пула (${config.benchmark.mode})`
+            : 'фиксированным порогам'}
+          .
         </p>
       </div>
       <div className="min-h-56">

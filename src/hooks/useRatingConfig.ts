@@ -10,6 +10,7 @@ function mergeConfig(partial: Partial<RatingConfig>): RatingConfig {
     ...partial,
     weights: { ...DEFAULT_RATING_CONFIG.weights, ...(partial.weights ?? {}) },
     thresholds: { ...DEFAULT_RATING_CONFIG.thresholds, ...(partial.thresholds ?? {}) },
+    benchmark: { ...DEFAULT_RATING_CONFIG.benchmark, ...(partial.benchmark ?? {}) },
   }
 }
 
