@@ -221,24 +221,26 @@ export function AdminPanel({ players, onAdd, onRemove, onUpdateRoles, onRefreshA
 
       <Card className="glass">
         <CardHeader>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle className="text-base">Игроки общего пула</CardTitle>
               <CardDescription>Назначайте несколько игровых ролей каждому игроку.</CardDescription>
             </div>
-            <Button size="sm" variant="outline" onClick={() => void refreshAll()} disabled={refreshingAll || players.length === 0}>
-              <RefreshCw className={refreshingAll ? 'size-4 animate-spin' : 'size-4'} />
-              {refreshingAll ? 'Обновление...' : 'Обновить всех'}
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => setDeleteTargetIds([...selectedPlayers])}
-              disabled={selectedPlayers.size === 0 || deleting}
-            >
-              <Trash2 className="size-4" />
-              Удалить выбранных ({selectedPlayers.size})
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => void refreshAll()} disabled={refreshingAll || players.length === 0}>
+                <RefreshCw className={refreshingAll ? 'size-4 animate-spin' : 'size-4'} />
+                {refreshingAll ? 'Обновление...' : 'Обновить всех'}
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setDeleteTargetIds([...selectedPlayers])}
+                disabled={selectedPlayers.size === 0 || deleting}
+              >
+                <Trash2 className="size-4" />
+                Удалить выбранных ({selectedPlayers.size})
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

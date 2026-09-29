@@ -19,8 +19,8 @@ interface HeaderProps {
 export function Header({ playersCount, theme, onThemeToggle, auth, showAdmin }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/95">
-      <div className="mx-auto flex min-h-16 w-full max-w-6xl items-center gap-6 px-4 py-3 md:px-6">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="mx-auto flex min-h-16 w-full max-w-6xl flex-wrap items-center gap-3 px-3 py-3 sm:gap-4 md:flex-nowrap md:gap-6 md:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="grid size-7 shrink-0 place-items-center border border-primary bg-primary/10 text-primary">
             <Swords className="size-3.5" />
           </div>
@@ -30,8 +30,8 @@ export function Header({ playersCount, theme, onThemeToggle, auth, showAdmin }: 
           </div>
         </div>
 
-        <TabsList variant="line" className="ml-auto h-10 gap-1 bg-transparent p-0">
-          <TabsTrigger value="players">
+        <TabsList variant="line" className="order-3 w-full max-w-full shrink-0 justify-start gap-1 overflow-x-auto bg-transparent p-0 md:order-none md:ml-auto md:h-10 md:w-auto md:justify-end md:overflow-visible">
+          <TabsTrigger className="shrink-0" value="players">
             <Users className="size-3.5" />
             <span>Игроки</span>
             {playersCount > 0 && (
@@ -40,16 +40,16 @@ export function Header({ playersCount, theme, onThemeToggle, auth, showAdmin }: 
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="formula">
+          <TabsTrigger className="shrink-0" value="formula">
             <Sigma className="size-3.5" />
             <span>Формула</span>
           </TabsTrigger>
-          <TabsTrigger value="teams">
+          <TabsTrigger className="shrink-0" value="teams">
             <Swords className="size-3.5" />
             <span>Команды</span>
           </TabsTrigger>
           {showAdmin && (
-            <TabsTrigger value="admin">
+            <TabsTrigger className="shrink-0" value="admin">
               <Shield className="size-3.5" />
               <span>Админ</span>
             </TabsTrigger>

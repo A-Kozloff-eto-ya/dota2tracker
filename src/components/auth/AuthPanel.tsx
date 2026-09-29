@@ -63,7 +63,7 @@ export function AuthPanel({ configured, loading, user, onSignIn, onSignOut }: Au
         onKeyDown={(event) => { if (event.key === 'Enter') void submit() }}
         placeholder="email"
         type="email"
-        className="h-8 w-32 text-xs sm:w-44"
+        className="h-8 w-24 text-xs sm:w-44"
       />
       <Button size="sm" onClick={() => void submit()} disabled={sending || cooldown > 0 || !email.trim()}>
         <LogIn className="size-3.5" />

@@ -127,7 +127,7 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             value={value}
             onChange={(event) => setValue(event.target.value)}
@@ -137,7 +137,7 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
             placeholder="https://steamcommunity.com/profiles/7656119…"
             className="flex-1"
           />
-          <Button onClick={() => void handleSearch()} disabled={searching || !value.trim()}>
+          <Button className="w-full sm:w-auto" onClick={() => void handleSearch()} disabled={searching || !value.trim()}>
             {searching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
             Найти
           </Button>

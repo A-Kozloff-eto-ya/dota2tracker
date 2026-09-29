@@ -25,7 +25,7 @@ export function PageHead({
           {kicker} / {index}
         </span>
       </div>
-      <div className="mt-5 flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+      <div className="mt-5 flex flex-wrap items-end justify-between gap-x-8 gap-y-5 sm:gap-x-12 sm:gap-y-6">
         <h1 className="text-[clamp(2.75rem,8vw,5.5rem)] font-medium leading-[0.95] tracking-[-0.04em]">
           {title}
         </h1>

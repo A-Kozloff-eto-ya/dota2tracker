@@ -165,7 +165,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                 <div
                   key={accountId}
                   className={cn(
-                    'flex items-center gap-3 border px-3 py-2 transition-colors',
+                    'flex flex-wrap items-center gap-2 border px-2 py-2 transition-colors sm:gap-3 sm:px-3',
                     isSelected ? 'border-primary/50 bg-primary/5' : 'border-border/70',
                   )}
                 >
@@ -183,7 +183,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                   ) : (
                     <div className="size-9 rounded-full bg-muted" />
                   )}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 basis-[calc(100%-7rem)] sm:basis-auto">
                     <div className="truncate text-sm font-medium">
                       {item.player.personaname}
                     </div>
@@ -202,7 +202,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                       }))
                     }
                   >
-                    <SelectTrigger className="w-36" size="sm">
+                    <SelectTrigger className="w-full sm:w-36" size="sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -214,7 +214,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                     </SelectContent>
                   </Select>
                   {item.player.roles.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex basis-full flex-wrap gap-1 sm:basis-auto">
                       {item.player.roles.map((playerRole) => (
                         <Badge key={playerRole} variant="outline" className="text-[10px]">
                           {PLAYER_ROLE_LABELS[playerRole]}
@@ -269,7 +269,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
               <Label htmlFor="respect-roles">Учитывать роли</Label>
             </div>
 
-            <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
               <Badge variant="secondary">
                 Выбрано: {selected.size} / нужно минимум {teamCount}
               </Badge>
@@ -284,6 +284,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                 size="sm"
                 onClick={() => runBalance(0)}
                 disabled={selected.size < teamCount}
+                className="flex-1 sm:flex-none"
               >
                 <Wand2 className="size-4" />
                 Сбалансировать
@@ -294,6 +295,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                 onClick={() => runBalance(variantIndex + 1)}
                 disabled={selected.size < teamCount}
                 title="Показать следующий по качеству вариант разбиения"
+                className="flex-1 sm:flex-none"
               >
                 <Shuffle className="size-4" />
                 Ещё вариант

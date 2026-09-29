@@ -55,7 +55,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canMana
     <>
       <Card className="glass border-x-0 border-b border-t-0 py-5 transition-colors hover:border-primary/40">
       <CardHeader className="pb-3">
-        <div className="flex h-[4.5rem] items-stretch gap-3">
+        <div className="flex min-h-[4.5rem] items-stretch gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => setDetailOpen(true)}
@@ -117,7 +117,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canMana
               )}
             </div>
           </button>
-          <div className="flex flex-col justify-center text-right">
+          <div className="flex shrink-0 flex-col justify-center text-right">
             <RatingBadge rating={evaluation?.rating ?? null} size="lg" />
             <div className="mt-1 text-[10px] text-muted-foreground">
               {timeAgo(fetchedAt)}
@@ -130,8 +130,8 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canMana
         {status === 'error' && (
           <Alert variant="destructive">
             <AlertTitle>Ошибка загрузки</AlertTitle>
-            <AlertDescription className="flex items-center justify-between gap-2">
-              <span className="text-xs">{error}</span>
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+              <span className="min-w-0 flex-1 break-words text-xs">{error}</span>
               <Button
                 size="sm"
                 variant="outline"

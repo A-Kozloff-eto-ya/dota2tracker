@@ -32,7 +32,7 @@ export function TeamView({ team, teamCount, byId, showRoleWarnings }: TeamViewPr
       )}
     >
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <div className={cn('font-display text-sm tracking-wide', style.text)}>
               {teamDisplayName(team.index, teamCount)}
@@ -42,7 +42,7 @@ export function TeamView({ team, teamCount, byId, showRoleWarnings }: TeamViewPr
               {team.total.toLocaleString('ru-RU')}
             </div>
           </div>
-          <div className="text-right">
+          <div className="shrink-0 text-right">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Средний
             </div>
@@ -97,7 +97,7 @@ function DraggablePlayerRow(props: {
         transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined
       }
       className={cn(
-        'flex items-center gap-2 border-b border-border/70 bg-card/60 px-2 py-2',
+        'flex items-center gap-1.5 border-b border-border/70 bg-card/60 px-1.5 py-2 sm:gap-2 sm:px-2',
         isDragging && 'opacity-40',
       )}
     >
@@ -130,7 +130,7 @@ function DraggablePlayerRow(props: {
           />
           {medal.label}
           {props.role != null && (
-            <span className="ml-1 rounded bg-secondary px-1 py-px">
+            <span className="ml-1 max-w-[9rem] truncate rounded bg-secondary px-1 py-px sm:max-w-none">
               Поз. {props.role} · {ROLE_NAMES[props.role]}
             </span>
           )}

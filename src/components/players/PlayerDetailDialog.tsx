@@ -63,9 +63,9 @@ export function PlayerDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] overflow-y-auto scrollbar-thin sm:max-w-3xl">
+      <DialogContent className="max-h-[88vh] overflow-y-auto scrollbar-thin p-4 sm:max-w-3xl sm:p-6">
         <DialogHeader>
-          <div className="flex items-start gap-4">
+          <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap sm:gap-4">
             {profile?.avatarfull ? (
               <img
                 src={profile.avatarfull}
@@ -114,7 +114,7 @@ export function PlayerDetailDialog({
                 />
               </div>
             </div>
-            <div className="text-right">
+            <div className="ml-auto shrink-0 text-right">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 Рейтинг
               </div>
@@ -124,7 +124,7 @@ export function PlayerDetailDialog({
         </DialogHeader>
 
         {winrate != null && (
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-x-auto pb-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 Победы: {fmtInt(stats?.wl.win ?? 0)} · Поражения: {fmtInt(stats?.wl.lose ?? 0)}

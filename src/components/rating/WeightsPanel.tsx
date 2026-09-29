@@ -14,9 +14,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
-import { fmtInt } from '@/lib/format'
+import { fmtDecimal, fmtInt } from '@/lib/format'
 import { medalFromRankTier } from '@/lib/medals'
-import type { RatedPlayer, RatingConfig } from '@/types'
+import { PLAYER_ROLE_LABELS } from '@/lib/playerRoles'
+import type { PlayerRole, RatedPlayer, RatingConfig } from '@/types'
 
 interface WeightsPanelProps {
   config: RatingConfig
@@ -252,7 +253,57 @@ export function WeightsPanel({ config, onChange, onReset, rated }: WeightsPanelP
           )}
         </CardContent>
       </Card>
+      <RoleBenchmarks rated={rated} />
     </div>
+  )
+}
+
+const BENCHMARK_ROLES: PlayerRole[] = ['carry', 'mid', 'offlane', 'soft_support', 'hard_support']
+
+function RoleBenchmarks({ rated }: { rated: RatedPlayer[] }) {
+  return (
+    <Card className="glass lg:col-span-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Ролевые эталоны</CardTitle>
+        <CardDescription>
+          Лучшие загруженные игроки вашего пула по каждому игровому тегу
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {BENCHMARK_ROLES.map((role) => {
+            const benchmark = rated
+              .filter((item) => item.player.roles.includes(role) && item.evaluation?.rating != null)
+              .sort((a, b) => (b.evaluation?.rating ?? -1) - (a.evaluation?.rating ?? -1))[0]
+            const perf = benchmark?.evaluation?.perf
+
+            return (
+              <div key={role} className="min-w-0 border border-border/70 bg-card/50 p-3">
+                <div className="tlabel mb-2">{PLAYER_ROLE_LABELS[role]}</div>
+                {benchmark ? (
+                  <>
+                    <div className="truncate text-sm font-medium" title={benchmark.player.personaname}>
+                      {benchmark.player.personaname}
+                    </div>
+                    <div className="mt-1 text-lg font-semibold tabular-nums text-primary">
+                      {fmtInt(benchmark.evaluation?.rating ?? null)}
+                    </div>
+                    <div className="mt-2 space-y-1 text-[10px] tabular-nums text-muted-foreground">
+                      <div className="flex justify-between gap-2"><span>KDA</span><span>{fmtDecimal(perf?.kda)}</span></div>
+                      <div className="flex justify-between gap-2"><span>GPM</span><span>{fmtInt(perf?.gpm)}</span></div>
+                      <div className="flex justify-between gap-2"><span>XPM</span><span>{fmtInt(perf?.xpm)}</span></div>
+                      <div className="flex justify-between gap-2"><span>DPM</span><span>{fmtInt(perf?.dpm)}</span></div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-3 text-xs text-muted-foreground">Нет игрока с этим тегом</div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

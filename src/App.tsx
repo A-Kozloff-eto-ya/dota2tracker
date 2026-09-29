@@ -80,7 +80,7 @@ export default function App() {
             }}
           />
 
-          <main className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-6 md:py-12">
+          <main className="mx-auto w-full max-w-6xl space-y-6 px-3 py-6 sm:space-y-8 sm:px-4 sm:py-8 md:px-6 md:py-12">
             <TabsContent value="players" className="space-y-6">
               <PageHead
                 index="001"
@@ -149,7 +149,7 @@ export default function App() {
             )}
           </main>
 
-          <footer className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 pb-8 pt-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground md:px-6">
+          <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-3 pb-8 pt-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground sm:px-4 md:px-6">
             <span>STRATZ GraphQL API</span>
             <span>LOCAL RATING / 2026</span>
           </footer>
