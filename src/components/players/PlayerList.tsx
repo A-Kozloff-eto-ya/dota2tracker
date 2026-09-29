@@ -8,9 +8,10 @@ interface PlayerListProps {
   config: RatingConfig
   onRemove: (accountId: number) => void
   onRefresh: (accountId: number) => void
+  canManage: boolean
 }
 
-export function PlayerList({ rated, heroes, config, onRemove, onRefresh }: PlayerListProps) {
+export function PlayerList({ rated, heroes, config, onRemove, onRefresh, canManage }: PlayerListProps) {
   if (rated.length === 0) {
     return (
       <Alert>
@@ -28,7 +29,7 @@ export function PlayerList({ rated, heroes, config, onRemove, onRefresh }: Playe
   )
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="border-t border-border/80">
       {sorted.map((item) => (
         <PlayerCard
           key={item.player.accountId}
@@ -37,6 +38,7 @@ export function PlayerList({ rated, heroes, config, onRemove, onRefresh }: Playe
           config={config}
           onRemove={onRemove}
           onRefresh={onRefresh}
+          canManage={canManage}
         />
       ))}
     </div>

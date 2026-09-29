@@ -13,14 +13,10 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5173,
+    strictPort: true,
     proxy: {
-      // Steam Web API не отдаёт CORS-заголовки — ходим через локальный прокси.
-      // В продакшене аналогичный прокси нужно настроить на хостинге.
-      '/steamapi': {
-        target: 'https://api.steampowered.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/steamapi/, ''),
-      },
+      '/api': 'http://localhost:3000',
     },
   },
   build: {

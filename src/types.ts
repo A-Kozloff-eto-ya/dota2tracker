@@ -60,7 +60,10 @@ export interface TrackedPlayer {
   personaname: string
   avatarfull: string | null
   addedAt: number
+  roles: PlayerRole[]
 }
+
+export type PlayerRole = 'carry' | 'mid' | 'offlane' | 'soft_support' | 'hard_support'
 
 export type PlayerStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -147,6 +150,7 @@ export interface BalancePlayer {
   accountId: number
   rating: number
   role: Role | null
+  allowedRoles: Role[]
 }
 
 export interface BalanceTeam {

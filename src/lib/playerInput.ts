@@ -15,7 +15,7 @@ export function parsePlayerInput(raw: string): ParsedPlayerInput {
 
   // Ссылка вида steamcommunity.com/id/<vanity> — короткое имя профиля,
   // конвертируется в SteamID через Steam Web API (см. src/api/steam.ts)
-  const vanity = value.match(/steamcommunity\.com\/id\/([A-Za-z0-9_.\-]+)/i)
+  const vanity = value.match(/steamcommunity\.com\/id\/([A-Za-z0-9_.-]+)/i)
   if (vanity) {
     return {
       kind: 'vanity',

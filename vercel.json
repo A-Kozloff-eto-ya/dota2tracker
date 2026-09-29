@@ -1,8 +1,7 @@
 {
-  "rewrites": [
-    {
-      "source": "/steamapi/:path*",
-      "destination": "https://api.steampowered.com/:path*"
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 30
     }
-  ]
+  }
 }

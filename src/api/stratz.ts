@@ -1,15 +1,8 @@
-// Клиент STRATZ GraphQL API — единственный источник данных приложения.
-// Ходит напрямую на api.stratz.com — у STRATZ есть CORS (access-control-allow-origin: *),
-// облачный фильтр пропускает запросы с браузерным клиентом.
-// Ключ: stratz.com → страница API (JWT).
+// Клиентский адаптер STRATZ. Сам GraphQL-запрос проксируется через
+// /api/stratz, поэтому JWT остаётся только на сервере.
 
 import { steamId64FromAccount } from '@/lib/playerInput'
-import {
-  STORAGE_KEYS,
-  getStratzApiKey,
-  loadJSON,
-  saveJSON,
-} from '@/lib/storage'
+import { STORAGE_KEYS, loadJSON, saveJSON } from '@/lib/storage'
 import type {
   HeroInfo,
   HeroPlayed,
@@ -18,7 +11,6 @@ import type {
   SearchEntry,
 } from '@/types'
 
-const STRATZ_GRAPHQL = 'https://api.stratz.com/graphql'
 const MATCHES_TAKE = 50
 const HEROES_TAKE = 126
 const HEROES_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -34,34 +26,22 @@ async function stratzQuery<T>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
-  const apiKey = getStratzApiKey()
-  if (!apiKey) {
-    throw new StratzError('Не задан STRATZ API ключ — задайте VITE_STRATZ_API_KEY в .env')
-  }
-
-  const res = await fetch(STRATZ_GRAPHQL, {
+  const res = await fetch('/api/stratz', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      // Локализованные названия героев (language { displayName })
-      'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
     signal: AbortSignal.timeout(15000),
   })
 
   if (res.status === 401 || res.status === 403) {
-    throw new StratzError('STRATZ отклонил ключ — проверьте STRATZ API ключ в настройках')
+    throw new StratzError('STRATZ отклонил серверный ключ — проверьте настройки Vercel')
   }
   if (res.status === 429) {
     throw new StratzError('Превышен лимит запросов STRATZ — подождите немного')
   }
-  if (!res.ok) {
-    throw new StratzError(`Ошибка STRATZ API (${res.status})`)
-  }
-
-  const json = (await res.json()) as GraphQLResponse<T>
+  const json = (await res.json().catch(() => null)) as GraphQLResponse<T> & { error?: string } | null
+  if (!res.ok) throw new StratzError(json?.error ?? `Ошибка STRATZ API (${res.status})`)
+  if (!json) throw new StratzError('STRATZ вернул некорректный ответ')
   // GraphQL может вернуть и data, и errors одновременно (частичный ответ —
   // например, «Player is anonymous» по отдельным полям). Отбрасываем ответ
   // только если данных нет вовсе.

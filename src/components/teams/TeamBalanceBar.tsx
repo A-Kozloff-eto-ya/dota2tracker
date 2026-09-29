@@ -2,6 +2,7 @@ import { fmtInt } from '@/lib/format'
 import type { BalanceResult } from '@/types'
 import { cn } from '@/lib/utils'
 import { teamStyle } from '@/components/teams/teamStyles'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface TeamBalanceBarProps {
   result: BalanceResult
@@ -14,7 +15,7 @@ export function TeamBalanceBar({ result, variantIndex }: TeamBalanceBarProps) {
   const max = Math.max(...result.teams.map((t) => t.avg), 1)
 
   return (
-    <div className="glass space-y-3 rounded-xl border border-border p-4">
+    <div className="glass space-y-4 border border-border p-4 md:p-5">
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium">Сравнение средних рейтингов</span>
         <span
@@ -32,20 +33,28 @@ export function TeamBalanceBar({ result, variantIndex }: TeamBalanceBarProps) {
         {result.teams.map((team) => {
           const style = teamStyle(team.index)
           return (
-            <div key={team.index} className="flex items-center gap-3">
-              <span className={cn('w-20 shrink-0 text-xs font-medium', style.text)}>
-                {style.name}
-              </span>
-              <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn('h-full rounded-full transition-all duration-700', style.bar)}
-                  style={{ width: `${Math.max(4, (team.avg / max) * 100)}%` }}
-                />
-              </div>
-              <span className="w-16 text-right text-sm font-semibold tabular-nums">
-                {fmtInt(Math.round(team.avg))}
-              </span>
-            </div>
+            <Tooltip key={team.index}>
+              <TooltipTrigger asChild>
+                <div className="flex cursor-help items-center gap-3">
+                  <span className={cn('w-20 shrink-0 text-xs font-medium', style.text)}>
+                    {style.name}
+                  </span>
+                  <div className="h-2 flex-1 overflow-hidden bg-muted">
+                    <div
+                      className={cn('h-full transition-all duration-700', style.bar)}
+                      style={{ width: `${Math.max(4, (team.avg / max) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="w-16 text-right text-sm font-semibold tabular-nums">
+                    {fmtInt(Math.round(team.avg))}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                {style.name}: средний рейтинг {fmtInt(Math.round(team.avg))}, игроков{' '}
+                {team.players.length}
+              </TooltipContent>
+            </Tooltip>
           )
         })}
       </div>

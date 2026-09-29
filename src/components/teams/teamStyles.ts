@@ -3,10 +3,10 @@
 export const TEAM_STYLES = [
   {
     name: 'Radiant',
-    text: 'text-radiant-bright',
+    text: 'text-primary',
     bar: 'bg-radiant',
-    ring: 'ring-radiant/60',
-    border: 'border-radiant/40',
+    ring: 'ring-primary/60',
+    border: 'border-primary/40',
   },
   {
     name: 'Dire',

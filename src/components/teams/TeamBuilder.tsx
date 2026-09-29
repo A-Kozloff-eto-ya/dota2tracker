@@ -37,6 +37,7 @@ import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import type { BalanceResult, RatedPlayer, Role } from '@/types'
 import { cn } from '@/lib/utils'
+import { PLAYER_ROLE_LABELS, preferredPosition } from '@/lib/playerRoles'
 
 const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'any', label: 'Любая' },
@@ -46,6 +47,8 @@ const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '4', label: `4 · ${ROLE_NAMES[4]}` },
   { value: '5', label: `5 · ${ROLE_NAMES[5]}` },
 ]
+
+const ALL_ROLES: Role[] = [1, 2, 3, 4, 5]
 
 interface TeamBuilderProps {
   rated: RatedPlayer[]
@@ -59,7 +62,9 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
   const unavailable = rated.length - available.length
 
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [roles, setRoles] = useState<Record<number, Role | null>>({})
+  // A value present in this map is an explicit per-setup override. Without
+  // one, the first admin-assigned player tag is used as the default position.
+  const [roleOverrides, setRoleOverrides] = useState<Record<number, Role | null>>({})
   const [teamCount, setTeamCount] = useState(2)
   const [respectRoles, setRespectRoles] = useState(false)
   const [variantIndex, setVariantIndex] = useState(0)
@@ -71,12 +76,24 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
     () =>
       available
         .filter((item) => selected.has(item.player.accountId))
-        .map((item) => ({
-          accountId: item.player.accountId,
-          rating: item.evaluation?.rating ?? 0,
-          role: roles[item.player.accountId] ?? null,
-        })),
-    [available, selected, roles],
+        .map((item) => {
+          const hasOverride = Object.prototype.hasOwnProperty.call(roleOverrides, item.player.accountId)
+          const override = hasOverride ? roleOverrides[item.player.accountId] : undefined
+          const taggedRoles = item.player.roles
+            .map((playerRole) => preferredPosition([playerRole]))
+            .filter((role): role is Role => role != null)
+          return {
+            accountId: item.player.accountId,
+            rating: item.evaluation?.rating ?? 0,
+            role: hasOverride ? override ?? null : preferredPosition(item.player.roles),
+            allowedRoles: override != null
+              ? [override]
+              : hasOverride
+                ? ALL_ROLES
+                : (taggedRoles.length > 0 ? taggedRoles : ALL_ROLES),
+          }
+        }),
+    [available, roleOverrides, selected],
   )
 
   const byId = useMemo(
@@ -126,14 +143,14 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
 
   return (
     <div className="space-y-4">
-      <Card className="glass">
+      <Card className="glass border-l-2 border-l-primary">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="size-4 text-primary" />
             Пул игроков
           </CardTitle>
           <CardDescription>
-            Отметьте участников (лучше кратно числу команд) и при желании укажите позиции
+            Отметьте участников (по 5 игроков на команду) и при желании переопределите позиции
             {unavailable > 0 ? ` · без рейтинга: ${unavailable}` : ''}
           </CardDescription>
         </CardHeader>
@@ -142,12 +159,13 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
             {available.map((item) => {
               const accountId = item.player.accountId
               const isSelected = selected.has(accountId)
-              const role = roles[accountId] ?? null
+              const hasOverride = Object.prototype.hasOwnProperty.call(roleOverrides, accountId)
+              const role = hasOverride ? roleOverrides[accountId] ?? null : preferredPosition(item.player.roles)
               return (
                 <div
                   key={accountId}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors',
+                    'flex items-center gap-3 border px-3 py-2 transition-colors',
                     isSelected ? 'border-primary/50 bg-primary/5' : 'border-border/70',
                   )}
                 >
@@ -178,7 +196,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                   <Select
                     value={role != null ? String(role) : 'any'}
                     onValueChange={(value) =>
-                      setRoles((prev) => ({
+                     setRoleOverrides((prev) => ({
                         ...prev,
                         [accountId]: value === 'any' ? null : (Number(value) as Role),
                       }))
@@ -195,6 +213,15 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                       ))}
                     </SelectContent>
                   </Select>
+                  {item.player.roles.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {item.player.roles.map((playerRole) => (
+                        <Badge key={playerRole} variant="outline" className="text-[10px]">
+                          {PLAYER_ROLE_LABELS[playerRole]}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   <RatingBadge
                     rating={item.evaluation?.rating ?? null}
                     size="sm"

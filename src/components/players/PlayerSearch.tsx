@@ -1,4 +1,4 @@
-import { Check, Loader2, Search, UserPlus } from 'lucide-react'
+import { Check, Loader2, Search } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -18,8 +18,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { fmtDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
-
-const QUICK_EXAMPLES = ['Dendi', 'Miracle-', 'SumaiL', 'Puppey']
 
 interface PlayerSearchProps {
   onAdd: (accountId: number, personaname?: string, avatarfull?: string | null) => Promise<boolean>
@@ -118,10 +116,10 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
   }
 
   return (
-    <Card className="glass">
+    <Card className="glass border-primary/30">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <UserPlus className="size-4 text-primary" />
+          <span className="font-mono text-xs text-primary">01</span>
           Добавить игрока
         </CardTitle>
         <CardDescription>
@@ -136,7 +134,7 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
             onKeyDown={(event) => {
               if (event.key === 'Enter') void handleSearch()
             }}
-            placeholder="Например: Dendi или 70388657"
+            placeholder="https://steamcommunity.com/profiles/7656119…"
             className="flex-1"
           />
           <Button onClick={() => void handleSearch()} disabled={searching || !value.trim()}>
@@ -146,23 +144,6 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
         </div>
 
         {parsedHint && <Badge variant="outline">{parsedHint}</Badge>}
-
-        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          Примеры:
-          {QUICK_EXAMPLES.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => {
-                setValue(name)
-                void handleSearch(name)
-              }}
-              className="rounded-full border border-border px-2 py-0.5 transition-colors hover:border-primary/50 hover:text-foreground"
-            >
-              {name}
-            </button>
-          ))}
-        </div>
 
         {results.length > 0 && (
           <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">

@@ -34,7 +34,7 @@ export function WeightsPanel({ config, onChange, onReset, rated }: WeightsPanelP
 
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[400px_1fr]">
-      <Card className="glass">
+      <Card className="glass border-l-2 border-l-primary">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sigma className="size-4 text-primary" />

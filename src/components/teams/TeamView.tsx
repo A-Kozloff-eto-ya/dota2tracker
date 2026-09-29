@@ -68,7 +68,7 @@ export function TeamView({ team, teamCount, byId, showRoleWarnings }: TeamViewPr
           (_, emptyIndex) => (
             <div
               key={`empty-${emptyIndex}`}
-              className="flex h-11 items-center justify-center rounded-lg border border-dashed border-border/70 text-xs text-muted-foreground"
+              className="flex h-11 items-center justify-center border border-dashed border-border/70 text-xs text-muted-foreground"
             >
               Пустой слот — перетащите игрока
             </div>
@@ -97,7 +97,7 @@ function DraggablePlayerRow(props: {
         transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined
       }
       className={cn(
-        'flex items-center gap-2 rounded-lg border border-border/70 bg-card/60 px-2 py-1.5',
+        'flex items-center gap-2 border-b border-border/70 bg-card/60 px-2 py-2',
         isDragging && 'opacity-40',
       )}
     >

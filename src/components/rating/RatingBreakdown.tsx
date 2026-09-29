@@ -5,6 +5,7 @@ import {
   Radar,
   RadarChart,
   ResponsiveContainer,
+  Tooltip,
 } from 'recharts'
 
 import { fmtInt } from '@/lib/format'
@@ -92,12 +93,55 @@ export function RatingBreakdown({ evaluation, config }: RatingBreakdownProps) {
       <div className="min-h-56">
         <ResponsiveContainer width="100%" height={224}>
           <RadarChart data={radarData} outerRadius="72%">
-            <PolarGrid stroke="#2a3444" />
-            <PolarAngleAxis dataKey="axis" tick={{ fill: '#9099a9', fontSize: 11 }} />
+            <defs>
+              <linearGradient id="ratingRadarFill" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#3155ff" stopOpacity={0.48} />
+                <stop offset="100%" stopColor="#2447ff" stopOpacity={0.08} />
+              </linearGradient>
+              <filter id="ratingRadarGlow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <PolarGrid stroke="var(--chart-grid)" />
+            <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--chart-label)', fontSize: 11 }} />
             <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-            <Radar dataKey="value" stroke="#c8402c" fill="#c8402c" fillOpacity={0.35} />
+            <Tooltip content={<RadarTooltip />} cursor={false} />
+            <Radar
+              dataKey="value"
+              stroke="#5270ff"
+              strokeWidth={1.5}
+              fill="url(#ratingRadarFill)"
+              fillOpacity={1}
+              dot={{ r: 3, fill: 'var(--chart-dot)', stroke: '#3155ff', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: '#ffffff', stroke: '#3155ff', strokeWidth: 2 }}
+              filter="url(#ratingRadarGlow)"
+            />
           </RadarChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+function RadarTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ payload?: { axis?: string; value?: number } }>
+}) {
+  if (!active || !payload?.[0]?.payload) return null
+  const point = payload[0].payload
+
+  return (
+    <div className="chart-tooltip border border-primary/50 bg-popover px-3 py-2 font-mono text-[10px] uppercase tracking-wide">
+      <div className="mb-1 text-muted-foreground">{point.axis}</div>
+      <div className="text-base font-medium tracking-normal text-foreground">
+        {point.value ?? 0} <span className="text-xs text-primary">/ 100</span>
       </div>
     </div>
   )

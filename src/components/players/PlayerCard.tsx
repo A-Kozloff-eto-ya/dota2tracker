@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { flagEmoji, fmtDecimal, fmtInt, fmtPct, timeAgo } from '@/lib/format'
 import { medalFromRankTier } from '@/lib/medals'
 import { cn } from '@/lib/utils'
+import { PLAYER_ROLE_LABELS } from '@/lib/playerRoles'
 
 interface PlayerCardProps {
   rated: RatedPlayer
@@ -29,9 +30,10 @@ interface PlayerCardProps {
   config: RatingConfig
   onRemove: (accountId: number) => void
   onRefresh: (accountId: number) => void
+  canManage: boolean
 }
 
-export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: PlayerCardProps) {
+export function PlayerCard({ rated, heroes, config, onRemove, onRefresh, canManage }: PlayerCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const { player, status, error, fetchedAt } = rated
@@ -51,7 +53,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
 
   return (
     <>
-      <Card className="glass overflow-hidden transition-colors hover:border-primary/40">
+      <Card className="glass border-x-0 border-b border-t-0 py-5 transition-colors hover:border-primary/40">
       <CardHeader className="pb-3">
         <div className="flex h-[4.5rem] items-stretch gap-3">
           <button
@@ -96,6 +98,15 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
             </div>
             {profile?.name && (
               <div className="text-xs text-gold-bright">{profile.name}</div>
+            )}
+            {player.roles.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {player.roles.map((role) => (
+                  <Badge key={role} variant="secondary" className="text-[10px]">
+                    {PLAYER_ROLE_LABELS[role]}
+                  </Badge>
+                ))}
+              </div>
             )}
             <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
               <span>{medal.label}</span>
@@ -162,7 +173,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
 
         {stats && !isPrivate && (
           <>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-y border-border/70 py-3 sm:grid-cols-4">
               <StatCell label="Винрейт" value={fmtPct(winrate)} />
               <StatCell label="KDA (посл.)" value={fmtDecimal(perf?.kda)} />
               <StatCell
@@ -225,7 +236,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
                 />
               </Button>
               <div className="flex items-center gap-1">
-                <Button
+                {canManage && <Button
                   variant="ghost"
                   size="icon"
                   className="size-8"
@@ -238,7 +249,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
                   ) : (
                     <RefreshCw className="size-4" />
                   )}
-                </Button>
+                </Button>}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -248,7 +259,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
                 >
                   <Eye className="size-4" />
                 </Button>
-                <Button
+                {canManage && <Button
                   variant="ghost"
                   size="icon"
                   className="size-8 text-muted-foreground hover:text-destructive"
@@ -256,7 +267,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
                   title="Убрать из списка"
                 >
                   <Trash2 className="size-4" />
-                </Button>
+                </Button>}
               </div>
             </div>
 
@@ -290,7 +301,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
 
 function StatCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-muted/60 px-2 py-1.5">
+    <div className="border-l-2 border-border/80 pl-2">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="text-sm font-semibold tabular-nums">{value}</div>
     </div>

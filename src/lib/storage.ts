@@ -3,7 +3,6 @@
 export const STORAGE_KEYS = {
   players: 'd2t.players',
   config: 'd2t.ratingConfig',
-  stratzApiKey: 'd2t.stratzApiKey',
   heroes: 'd2t.heroesCache',
   stats: (id: number) => `d2t.stats.${id}`,
 } as const
@@ -40,32 +39,4 @@ export function removeKey(key: string): void {
 /** Удалить ключи, оставшиеся от старых источников данных */
 export function clearLegacyKeys(): void {
   for (const key of LEGACY_KEYS) removeKey(key)
-}
-
-export function getStratzApiKey(): string {
-  // Ранее сохранённый ключ (localStorage) приоритетнее ключа из env —
-  // оставлено для обратной совместимости с уже сохранёнными ключами.
-  return getString(STORAGE_KEYS.stratzApiKey) || getEnvStratzApiKey()
-}
-
-/**
- * Общий fallback-ключ из окружения сборки (VITE_STRATZ_API_KEY).
- * ВАЖНО: переменные VITE_* вшиваются в клиентский бандл и видны любому
- * пользователю — используйте его только для локальной сборки/демо.
- */
-export function getEnvStratzApiKey(): string {
-  return import.meta.env.VITE_STRATZ_API_KEY?.trim() ?? ''
-}
-
-/** Ключ Steam Web API из окружения сборки (VITE_STEAM_API_KEY) */
-export function getSteamApiKey(): string {
-  return import.meta.env.VITE_STEAM_API_KEY?.trim() ?? ''
-}
-
-function getString(key: string): string {
-  try {
-    return localStorage.getItem(key) ?? ''
-  } catch {
-    return ''
-  }
 }

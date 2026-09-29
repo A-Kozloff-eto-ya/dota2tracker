@@ -6,7 +6,7 @@
 // - k = 2 и n ≤ 18: гарантированно точный перебор разбиений
 // - иначе: снейк-драфт + локальная оптимизация обменами с рестартами
 
-import type { BalancePlayer, BalanceResult, BalanceTeam } from '@/types'
+import type { BalancePlayer, BalanceResult, BalanceTeam, Role } from '@/types'
 
 export const MAX_TEAM_COUNT = 6
 export const EXACT_SEARCH_LIMIT = 18
@@ -21,16 +21,48 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-function roleViolations(players: BalancePlayer[]): number {
-  const counts = new Map<number, number>()
-  for (const p of players) {
-    if (p.role != null) counts.set(p.role, (counts.get(p.role) ?? 0) + 1)
+const ALL_ROLES: Role[] = [1, 2, 3, 4, 5]
+
+function assignRoles(
+  players: BalancePlayer[],
+  respectRoles: boolean,
+): { players: BalancePlayer[]; missing: number } {
+  if (!respectRoles) {
+    return { players: players.map((player) => ({ ...player })), missing: 0 }
   }
-  let violations = 0
-  for (const count of counts.values()) {
-    if (count > 1) violations += count - 1
+
+  const owners = new Map<Role, number>()
+
+  function claim(playerIndex: number, seen: Set<Role>): boolean {
+    const allowed = players[playerIndex].allowedRoles.length > 0
+      ? players[playerIndex].allowedRoles
+      : ALL_ROLES
+    for (const role of allowed) {
+      if (seen.has(role)) continue
+      seen.add(role)
+      const owner = owners.get(role)
+      if (owner == null || claim(owner, seen)) {
+        owners.set(role, playerIndex)
+        return true
+      }
+    }
+    return false
   }
-  return violations
+
+  const order = players
+    .map((player, index) => ({ index, count: player.allowedRoles.length || ALL_ROLES.length }))
+    .sort((a, b) => a.count - b.count)
+  let matched = 0
+  for (const { index } of order) {
+    if (claim(index, new Set())) matched += 1
+  }
+
+  const assigned = new Map<number, Role>()
+  for (const [role, playerIndex] of owners) assigned.set(playerIndex, role)
+  return {
+    players: players.map((player, index) => ({ ...player, role: assigned.get(index) ?? null })),
+    missing: players.length - matched,
+  }
 }
 
 function rawScore(teams: BalancePlayer[][], respectRoles: boolean): number {
@@ -39,10 +71,9 @@ function rawScore(teams: BalancePlayer[][], respectRoles: boolean): number {
       players.reduce((sum, p) => sum + p.rating, 0) / Math.max(1, players.length),
   )
   const spread = Math.max(...avgs) - Math.min(...avgs)
-  let violations = 0
-  if (respectRoles) {
-    for (const players of teams) violations += roleViolations(players)
-  }
+  const violations = respectRoles
+    ? teams.reduce((sum, players) => sum + assignRoles(players, true).missing, 0)
+    : 0
   return spread + violations * 10000
 }
 
@@ -58,10 +89,11 @@ function popcount(x: number): number {
 /** Пересчитать total/avg/violations/spread для готового разбиения */
 export function finalizeTeams(teams: BalanceTeam[], respectRoles: boolean): BalanceResult {
   const finished: BalanceTeam[] = teams.map((team) => {
-    const players = [...team.players]
+    const assignment = assignRoles(team.players, respectRoles)
+    const players = assignment.players
     const total = players.reduce((sum, p) => sum + p.rating, 0)
     const avg = players.length > 0 ? total / players.length : 0
-    const violations = respectRoles ? roleViolations(players) : 0
+    const violations = respectRoles ? assignment.missing : 0
     return { ...team, players, total, avg, violations }
   })
   const avgs = finished.map((t) => t.avg)
@@ -266,6 +298,13 @@ export function balanceTeams(
   const extra = n % k
   const sizes = Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0))
   const safeVariant = Math.max(0, variantIndex)
+
+  if (respectRoles && n % k !== 0) {
+    throw new Error('При учёте ролей число игроков должно делиться на число команд')
+  }
+  if (respectRoles && n / k !== 5) {
+    throw new Error('При учёте ролей в каждой команде должно быть ровно 5 игроков')
+  }
 
   if (k === 2 && n <= EXACT_SEARCH_LIMIT) {
     const result = exactTwoTeams(players, sizes, respectRoles, safeVariant)
