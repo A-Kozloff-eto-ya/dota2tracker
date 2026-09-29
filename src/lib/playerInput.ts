@@ -6,11 +6,23 @@ const STEAM64_OFFSET = 76561197960265728n
 export type ParsedPlayerInput =
   | { kind: 'empty' }
   | { kind: 'accountId'; accountId: number; hint: string }
+  | { kind: 'vanity'; vanity: string; hint: string }
   | { kind: 'query'; query: string; hint: string }
 
 export function parsePlayerInput(raw: string): ParsedPlayerInput {
   const value = raw.trim()
   if (!value) return { kind: 'empty' }
+
+  // Ссылка вида steamcommunity.com/id/<vanity> — короткое имя профиля,
+  // конвертируется в SteamID через Steam Web API (см. src/api/steam.ts)
+  const vanity = value.match(/steamcommunity\.com\/id\/([A-Za-z0-9_.\-]+)/i)
+  if (vanity) {
+    return {
+      kind: 'vanity',
+      vanity: decodeURIComponent(vanity[1]),
+      hint: 'Ссылка на профиль',
+    }
+  }
 
   // Ссылка вида steamcommunity.com/profiles/<steam64> — просто парсим число
   const profiles = value.match(/steamcommunity\.com\/profiles\/(\d{7,20})/i)

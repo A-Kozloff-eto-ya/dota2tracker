@@ -2,6 +2,7 @@ import { Check, Loader2, Search, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { resolveVanityAccountId, SteamError } from '@/api/steam'
 import { searchPlayersStratz } from '@/api/stratz'
 import { parsePlayerInput } from '@/lib/playerInput'
 import type { SearchEntry } from '@/types'
@@ -66,6 +67,35 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
     }
 
     setParsedHint(parsed.hint)
+
+    // Ссылка steamcommunity.com/id/<имя> — точное преобразование в SteamID
+    // через Steam Web API, затем добавляем как обычный account_id.
+    // Если профиль не найден — пробуем искать имя из ссылки по нику.
+    if (parsed.kind === 'vanity') {
+      setSearching(true)
+      try {
+        const accountId = await resolveVanityAccountId(parsed.vanity)
+        if (accountId == null) {
+          toast.info(
+            `Профиль steamcommunity.com/id/${parsed.vanity} не найден — ищем по нику`,
+          )
+          await searchByNickname(parsed.vanity)
+          return
+        }
+        await handleAdd(accountId)
+        setValue('')
+      } catch (error) {
+        toast.error(
+          error instanceof SteamError
+            ? error.message
+            : 'Ошибка преобразования ссылки Steam',
+        )
+      } finally {
+        setSearching(false)
+      }
+      return
+    }
+
     await searchByNickname(parsed.query)
   }
 
@@ -95,7 +125,7 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
           Добавить игрока
         </CardTitle>
         <CardDescription>
-          Ник, account_id, SteamID64 или SteamID3
+          Ник, ссылка на профиль Steam, account_id, SteamID64 или SteamID3
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

@@ -53,29 +53,33 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
     <>
       <Card className="glass overflow-hidden transition-colors hover:border-primary/40">
       <CardHeader className="pb-3">
-        <div className="flex items-start gap-3">
+        <div className="flex h-[4.5rem] items-stretch gap-3">
           <button
             type="button"
             onClick={() => setDetailOpen(true)}
             title="Открыть профиль и историю матчей"
-            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full transition-opacity hover:opacity-80"
+            className="flex shrink-0 cursor-pointer items-center gap-1"
           >
-            <img
-              src={medal.iconUrl}
-              alt=""
-              className="size-12 shrink-0"
-              onError={(event) => {
-                event.currentTarget.style.display = 'none'
-              }}
-            />
-            {player.avatarfull ? (
+            <span className="relative block aspect-square h-full shrink-0">
               <img
-                src={player.avatarfull}
+                src={medal.iconUrl}
                 alt=""
-                className="size-12 rounded-full ring-2 ring-border"
+                className="absolute inset-0 size-full object-contain"
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none'
+                }}
               />
+            </span>
+            {player.avatarfull ? (
+              <span className="relative block aspect-square h-full shrink-0">
+                <img
+                  src={player.avatarfull}
+                  alt=""
+                  className="absolute inset-0 size-full rounded-full object-cover ring-2 ring-border"
+                />
+              </span>
             ) : (
-              <div className="grid size-12 shrink-0 place-items-center rounded-full bg-muted font-display text-muted-foreground">
+              <div className="grid aspect-square h-full shrink-0 place-items-center rounded-full bg-muted font-display text-muted-foreground">
                 {player.personaname.slice(0, 1).toUpperCase()}
               </div>
             )}
@@ -84,7 +88,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
             type="button"
             onClick={() => setDetailOpen(true)}
             title="Открыть профиль и историю матчей"
-            className="min-w-0 flex-1 cursor-pointer rounded-lg p-1 text-left transition-colors hover:bg-muted/40"
+            className="flex min-w-0 flex-1 cursor-pointer flex-col justify-center rounded-lg p-1 text-left transition-colors hover:bg-muted/40"
           >
             <div className="flex items-center gap-1.5">
               <span className="truncate font-semibold">{player.personaname}</span>
@@ -102,7 +106,7 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
               )}
             </div>
           </button>
-          <div className="text-right">
+          <div className="flex flex-col justify-center text-right">
             <RatingBadge rating={evaluation?.rating ?? null} size="lg" />
             <div className="mt-1 text-[10px] text-muted-foreground">
               {timeAgo(fetchedAt)}

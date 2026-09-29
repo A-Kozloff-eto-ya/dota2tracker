@@ -57,6 +57,11 @@ export function getEnvStratzApiKey(): string {
   return import.meta.env.VITE_STRATZ_API_KEY?.trim() ?? ''
 }
 
+/** Ключ Steam Web API из окружения сборки (VITE_STEAM_API_KEY) */
+export function getSteamApiKey(): string {
+  return import.meta.env.VITE_STEAM_API_KEY?.trim() ?? ''
+}
+
 function getString(key: string): string {
   try {
     return localStorage.getItem(key) ?? ''

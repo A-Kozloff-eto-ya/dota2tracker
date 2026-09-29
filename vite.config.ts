@@ -12,6 +12,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      // Steam Web API не отдаёт CORS-заголовки — ходим через локальный прокси.
+      // В продакшене аналогичный прокси нужно настроить на хостинге.
+      '/steamapi': {
+        target: 'https://api.steampowered.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/steamapi/, ''),
+      },
+    },
+  },
   build: {
     chunkSizeWarningLimit: 1200,
   },
