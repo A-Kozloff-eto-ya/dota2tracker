@@ -8,7 +8,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     return
   }
 
-  const apiKey = process.env.STRATZ_API_KEY
+  const apiKey = process.env.STRATZ_API_KEY?.trim()
   if (!apiKey) {
     json(response, 500, { error: 'STRATZ API is not configured' })
     return

@@ -47,6 +47,12 @@ interface PlayersOptions {
   isAdmin?: boolean
 }
 
+const STRATZ_REQUEST_DELAY_MS = 350
+
+function waitForStratzSlot(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, STRATZ_REQUEST_DELAY_MS))
+}
+
 export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = {}) {
   const [tracked, setTracked] = useState<TrackedPlayer[]>(() =>
     restoreTracked(),
@@ -55,6 +61,8 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
   const [statusMap, setStatusMap] = useState<Record<number, PlayerStatus>>({})
   const [errorMap, setErrorMap] = useState<Record<number, string | null>>({})
   const trackedRef = useRef(tracked)
+  const statsMapRef = useRef(statsMap)
+  const statusMapRef = useRef(statusMap)
 
   useEffect(() => {
     if (!supabase) return
@@ -91,6 +99,11 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
   useEffect(() => {
     trackedRef.current = tracked
   }, [tracked])
+
+  useEffect(() => {
+    statsMapRef.current = statsMap
+    statusMapRef.current = statusMap
+  }, [statsMap, statusMap])
 
   useEffect(() => {
     if (!userId) saveJSON(STORAGE_KEYS.players, tracked)
@@ -144,16 +157,24 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
 
   useEffect(() => {
     if (!supabase) return
+    let active = true
     const task = window.setTimeout(() => {
-      for (const player of tracked) {
-        const status = statusMap[player.accountId]
-        if (!statsMap[player.accountId] && (!status || status === 'idle')) {
-          void loadStats(player.accountId)
+      void (async () => {
+        for (const player of tracked) {
+          const status = statusMapRef.current[player.accountId]
+          if (!active) return
+          if (!statsMapRef.current[player.accountId] && (!status || status === 'idle')) {
+            await loadStats(player.accountId)
+            await waitForStratzSlot()
+          }
         }
-      }
+      })()
     }, 0)
-    return () => window.clearTimeout(task)
-  }, [loadStats, statsMap, statusMap, tracked, userId])
+    return () => {
+      active = false
+      window.clearTimeout(task)
+    }
+  }, [loadStats, tracked, userId])
 
   const addAccount = useCallback(
     async (accountId: number, personaname?: string, avatarfull?: string | null): Promise<boolean> => {
@@ -227,10 +248,11 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
     const players = [...trackedRef.current]
     let updated = 0
     let failed = 0
-    for (let index = 0; index < players.length; index += 3) {
-      const batch = players.slice(index, index + 3)
-      const results = await Promise.all(batch.map((player) => loadStats(player.accountId, true)))
-      results.forEach((ok) => { if (ok) updated += 1; else failed += 1 })
+    for (const player of players) {
+      const ok = await loadStats(player.accountId, true)
+      if (ok) updated += 1
+      else failed += 1
+      await waitForStratzSlot()
     }
     return { updated, failed }
   }, [loadStats])
