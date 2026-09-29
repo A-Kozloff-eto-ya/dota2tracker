@@ -11,12 +11,14 @@ interface PlayerListProps {
   rated: RatedPlayer[]
   heroes: Map<number, HeroInfo>
   config: RatingConfig
+  statsPeriodMonths: number
+  onStatsPeriodChange: (months: number) => void
   onRemove: (accountId: number) => void
   onRefresh: (accountId: number) => void
   canManage: boolean
 }
 
-export function PlayerList({ rated, heroes, config, onRemove, onRefresh, canManage }: PlayerListProps) {
+export function PlayerList({ rated, heroes, config, statsPeriodMonths, onStatsPeriodChange, onRemove, onRefresh, canManage }: PlayerListProps) {
   const [roleFilter, setRoleFilter] = useState<Role | null>(null)
 
   if (rated.length === 0) {
@@ -48,20 +50,37 @@ export function PlayerList({ rated, heroes, config, onRemove, onRefresh, canMana
           {roleFilter == null ? 'Все позиции' : `Лучшие: ${POSITION_LABELS[roleFilter]}`}
           {' · '}{filtered.length} игроков
         </span>
-        <Select
-          value={roleFilter == null ? 'all' : String(roleFilter)}
-          onValueChange={(value) => setRoleFilter(value === 'all' ? null : Number(value) as Role)}
-        >
-          <SelectTrigger className="w-full sm:w-44" size="sm">
-            <SelectValue placeholder="Позиция" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Все позиции</SelectItem>
-            {([1, 2, 3, 4, 5] as Role[]).map((role) => (
-              <SelectItem key={role} value={String(role)}>{POSITION_LABELS[role]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <Select
+            value={String(statsPeriodMonths)}
+            onValueChange={(value) => onStatsPeriodChange(Number(value))}
+          >
+            <SelectTrigger className="flex-1 sm:w-36 sm:flex-none" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Последний месяц</SelectItem>
+              <SelectItem value="3">Последние 3 месяца</SelectItem>
+              <SelectItem value="6">Последние 6 месяцев</SelectItem>
+              <SelectItem value="12">Последний год</SelectItem>
+              <SelectItem value="0">За всё время</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={roleFilter == null ? 'all' : String(roleFilter)}
+            onValueChange={(value) => setRoleFilter(value === 'all' ? null : Number(value) as Role)}
+          >
+            <SelectTrigger className="flex-1 sm:w-44 sm:flex-none" size="sm">
+              <SelectValue placeholder="Позиция" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все позиции</SelectItem>
+              {([1, 2, 3, 4, 5] as Role[]).map((role) => (
+                <SelectItem key={role} value={String(role)}>{POSITION_LABELS[role]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="border-t border-border/80">
       {sorted.map(({ item, evaluation }) => (

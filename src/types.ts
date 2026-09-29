@@ -60,6 +60,7 @@ export interface PlayerStats {
   wl: PlayerWl
   heroes: HeroPlayed[]
   recentMatches: RecentMatch[]
+  periodMonths?: number
   /** Behavior score (доступен только через STRATZ) */
   behaviorScore?: number | null
 }

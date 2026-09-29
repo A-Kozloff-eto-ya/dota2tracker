@@ -30,6 +30,8 @@ export default function App() {
     refreshPlayer,
     refreshAll,
     updatePlayerRoles,
+    statsPeriodMonths,
+    setStatsPeriodMonths,
   } = usePlayers({ userId: auth.user?.id, isAdmin: auth.user?.role === 'admin' })
   const { config, setConfig, resetConfig } = useRatingConfig()
   const heroes = useHeroes()
@@ -102,6 +104,8 @@ export default function App() {
                 rated={rated}
                 heroes={heroes}
                 config={config}
+                statsPeriodMonths={statsPeriodMonths}
+                onStatsPeriodChange={setStatsPeriodMonths}
                 onRemove={removePlayer}
                 onRefresh={refreshPlayer}
                 canManage={!auth.configured || auth.user?.role === 'admin'}

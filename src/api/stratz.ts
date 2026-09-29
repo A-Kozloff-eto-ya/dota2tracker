@@ -12,7 +12,8 @@ import type {
   Role,
 } from '@/types'
 
-const MATCHES_TAKE = 50
+const MATCHES_TAKE = 100
+export const DEFAULT_STATS_PERIOD_MONTHS = 3
 const HEROES_TAKE = 126
 const HEROES_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -230,7 +231,7 @@ function mapPosition(value: unknown): Role | null {
   return match ? (Number(match[1]) as Role) : null
 }
 
-const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!) {
+const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!, $from: Long!, $to: Long!) {
   player(steamAccountId: $id) {
     matchCount
     winCount
@@ -238,7 +239,7 @@ const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!) {
     ranks { rank asOfDateTime }
     steamAccount { name avatar countryCode seasonLeaderboardRank }
     heroesPerformance(take: ${HEROES_TAKE}) { heroId winCount matchCount }
-    matches(request: { take: $take }) {
+    matches(request: { take: $take, startDateTime: $from, endDateTime: $to, orderBy: DESC }) {
       id
       didRadiantWin
       durationSeconds
@@ -278,11 +279,16 @@ const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!) {
  */
 export async function fetchPlayerStatsStratz(
   accountId: number,
-  opts: { fresh?: boolean; take?: number } = {},
+  opts: { fresh?: boolean; take?: number; periodMonths?: number } = {},
 ): Promise<PlayerStats> {
+  const periodMonths = opts.periodMonths ?? DEFAULT_STATS_PERIOD_MONTHS
+  const to = Math.floor(Date.now() / 1000)
+  const from = periodMonths > 0
+    ? to - periodMonths * 30 * 24 * 60 * 60
+    : 0
   const data = await stratzQuery<{ player?: StratzPlayerResponse | null }>(
     PLAYER_STATS_QUERY,
-    { id: accountId, take: opts.take ?? MATCHES_TAKE },
+    { id: accountId, take: opts.take ?? MATCHES_TAKE, from, to },
   )
   const player = data.player
   if (!player) {
@@ -365,6 +371,7 @@ export async function fetchPlayerStatsStratz(
     wl: { win: winCount, lose: Math.max(0, matchCount - winCount) },
     heroes,
     recentMatches,
+    periodMonths,
     behaviorScore: player.behaviorScore ?? null,
   }
 }

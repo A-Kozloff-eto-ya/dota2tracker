@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { fetchPlayerStatsStratz } from '@/api/stratz'
+import { DEFAULT_STATS_PERIOD_MONTHS, fetchPlayerStatsStratz } from '@/api/stratz'
 import { supabase } from '@/lib/supabase'
 import { steamId64FromAccount } from '@/lib/playerInput'
 import {
@@ -53,10 +53,13 @@ function waitForStratzSlot(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, STRATZ_REQUEST_DELAY_MS))
 }
 
-function needsPositionRefresh(entry: StatsCacheEntry | undefined): boolean {
+function needsStatsRefresh(entry: StatsCacheEntry | undefined, periodMonths: number): boolean {
   return Boolean(
-    entry?.stats.recentMatches.length &&
-      !entry.stats.recentMatches.some((match) => match.position != null),
+    entry && (
+      entry.stats.periodMonths !== periodMonths ||
+      (entry.stats.recentMatches.length > 0 &&
+        !entry.stats.recentMatches.some((match) => match.position != null))
+    ),
   )
 }
 
@@ -67,6 +70,7 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
   const [statsMap, setStatsMap] = useState<Record<number, StatsCacheEntry>>(restoreStats)
   const [statusMap, setStatusMap] = useState<Record<number, PlayerStatus>>({})
   const [errorMap, setErrorMap] = useState<Record<number, string | null>>({})
+  const [statsPeriodMonths, setStatsPeriodMonths] = useState(DEFAULT_STATS_PERIOD_MONTHS)
   const trackedRef = useRef(tracked)
   const statsMapRef = useRef(statsMap)
   const statusMapRef = useRef(statusMap)
@@ -120,7 +124,7 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
     setStatusMap((prev) => ({ ...prev, [accountId]: 'loading' }))
     setErrorMap((prev) => ({ ...prev, [accountId]: null }))
     try {
-      const stats = await fetchPlayerStatsStratz(accountId, { fresh })
+      const stats = await fetchPlayerStatsStratz(accountId, { fresh, periodMonths: statsPeriodMonths })
       const entry: StatsCacheEntry = { fetchedAt: Date.now(), stats }
       setStatsMap((prev) => ({ ...prev, [accountId]: entry }))
       saveJSON(STORAGE_KEYS.stats(accountId), entry)
@@ -160,7 +164,12 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
       setStatusMap((prev) => ({ ...prev, [accountId]: 'error' }))
       return false
     }
-  }, [isAdmin, userId])
+  }, [isAdmin, statsPeriodMonths, userId])
+
+  const loadStatsRef = useRef(loadStats)
+  useEffect(() => {
+    loadStatsRef.current = loadStats
+  }, [loadStats])
 
   useEffect(() => {
     if (!supabase) return
@@ -171,8 +180,8 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
           const status = statusMapRef.current[player.accountId]
           const cached = statsMapRef.current[player.accountId]
           if (!active) return
-          if ((!cached || needsPositionRefresh(cached)) && (!status || status === 'idle')) {
-            await loadStats(player.accountId, needsPositionRefresh(cached))
+          if ((!cached || needsStatsRefresh(cached, statsPeriodMonths)) && (!status || status === 'idle')) {
+            await loadStatsRef.current(player.accountId, Boolean(cached))
             await waitForStratzSlot()
           }
         }
@@ -182,7 +191,7 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
       active = false
       window.clearTimeout(task)
     }
-  }, [loadStats, tracked, userId])
+  }, [statsPeriodMonths, tracked, userId])
 
   const addAccount = useCallback(
     async (accountId: number, personaname?: string, avatarfull?: string | null): Promise<boolean> => {
@@ -265,6 +274,15 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
     return { updated, failed }
   }, [loadStats])
 
+  const periodInitialized = useRef(false)
+  useEffect(() => {
+    if (!periodInitialized.current) {
+      periodInitialized.current = true
+      return
+    }
+    void refreshAll()
+  }, [refreshAll, statsPeriodMonths])
+
   return {
     tracked,
     statsMap,
@@ -274,6 +292,8 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
     removePlayer,
     refreshPlayer,
     refreshAll,
+    statsPeriodMonths,
+    setStatsPeriodMonths,
     updatePlayerRoles,
   }
 }
