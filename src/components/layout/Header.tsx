@@ -1,6 +1,5 @@
 import { Sigma, Swords, Users } from 'lucide-react'
 
-import { SettingsDialog } from '@/components/layout/SettingsDialog'
 import { Badge } from '@/components/ui/badge'
 import { TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -10,7 +9,7 @@ interface HeaderProps {
   playersCount: number
 }
 
-/** Шапка приложения: логотип, навигация-табы (внешний Tabs-контекст), настройки */
+/** Шапка приложения: логотип и навигация-табы (внешний Tabs-контекст) */
 export function Header({ playersCount }: HeaderProps) {
   return (
     <header className="glass sticky top-0 z-40 border-b border-border/60">
@@ -46,8 +45,6 @@ export function Header({ playersCount }: HeaderProps) {
             <span className="hidden sm:inline">Команды</span>
           </TabsTrigger>
         </TabsList>
-
-        <SettingsDialog />
       </div>
     </header>
   )

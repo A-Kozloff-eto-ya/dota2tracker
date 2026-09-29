@@ -36,7 +36,7 @@ async function stratzQuery<T>(
 ): Promise<T> {
   const apiKey = getStratzApiKey()
   if (!apiKey) {
-    throw new StratzError('Не задан STRATZ API ключ (настройки приложения)')
+    throw new StratzError('Не задан STRATZ API ключ — задайте VITE_STRATZ_API_KEY в .env')
   }
 
   const res = await fetch(STRATZ_GRAPHQL, {
@@ -214,17 +214,24 @@ interface StratzPlayerResponse {
   }> | null
 }
 
+// STRATZ отдаёт leaverStatus строкой enum-имени (LEAVER_STATUS_*).
+// Числовые значения соответствуют Dota 2 DOTALeaverStatus_t:
+//   0 NONE, 1 DISCONNECTED, 2 DISCONNECTED_TOO_LONG, 3 ABANDONED,
+//   4 AFK, 5 NEVER_CONNECTED, 6 NEVER_CONNECTED_TOO_LONG.
 const LEAVER_STATUS_BY_ENUM: Record<string, number> = {
   LEAVER_STATUS_NONE: 0,
-  LEAVER_STATUS_LEFT_SAFE: 1,
-  LEAVER_STATUS_AFK: 2,
-  LEAVER_STATUS_DISCONNECTED: 3,
-  LEAVER_STATUS_NEVER_CONNECTED: 3,
-  LEAVER_STATUS_LEAVER: 4,
+  LEAVER_STATUS_DISCONNECTED: 1,
+  LEAVER_STATUS_DISCONNECTED_TOO_LONG: 2,
+  LEAVER_STATUS_ABANDONED: 3,
+  LEAVER_STATUS_AFK: 4,
+  LEAVER_STATUS_NEVER_CONNECTED: 5,
+  LEAVER_STATUS_NEVER_CONNECTED_TOO_LONG: 6,
 }
 
 function mapLeaverStatus(value: unknown): number {
-  return typeof value === 'string' ? (LEAVER_STATUS_BY_ENUM[value] ?? 0) : 0
+  if (typeof value === 'string') return LEAVER_STATUS_BY_ENUM[value] ?? 0
+  if (typeof value === 'number') return value
+  return 0
 }
 
 const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!) {

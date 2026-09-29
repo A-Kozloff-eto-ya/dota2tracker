@@ -59,7 +59,10 @@ export function tierScoreOf(stats: PlayerStats): number | null {
 /** PerfScore: агрегаты по последним матчам */
 export function perfOf(stats: PlayerStats, config: RatingConfig): PerfDetails {
   const matches = stats.recentMatches
-    .filter((m) => m.leaverStatus < 3)
+    // Исключаем ливеров: учитываем только матчи, где игрок доиграл
+    // (0 NONE / 1 DISCONNECTED), отбрасывая DISCONNECTED_TOO_LONG,
+    // ABANDONED, AFK и NEVER_CONNECTED.
+    .filter((m) => m.leaverStatus < 2)
     .slice(0, config.recentMatchesCount)
 
   if (matches.length === 0) {

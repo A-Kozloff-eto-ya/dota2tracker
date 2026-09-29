@@ -6,13 +6,10 @@ export const STORAGE_KEYS = {
   stratzApiKey: 'd2t.stratzApiKey',
   heroes: 'd2t.heroesCache',
   stats: (id: number) => `d2t.stats.${id}`,
-  cache: (path: string) => `d2t.cache.${path}`,
 } as const
 
 /** Ключи, оставшиеся от удалённых источников (OpenDota/Steam) — чистим при старте */
 const LEGACY_KEYS = ['d2t.apiKey', 'd2t.steamApiKey'] as const
-
-const CACHE_PREFIX = 'd2t.cache.'
 
 export function loadJSON<T>(key: string, fallback: T): T {
   try {
@@ -40,35 +37,24 @@ export function removeKey(key: string): void {
   }
 }
 
-export function clearPrefixed(prefix: string): number {
-  try {
-    const doomed: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith(prefix)) doomed.push(key)
-    }
-    for (const key of doomed) localStorage.removeItem(key)
-    return doomed.length
-  } catch {
-    return 0
-  }
-}
-
-export function clearApiCache(): number {
-  return clearPrefixed(CACHE_PREFIX)
-}
-
 /** Удалить ключи, оставшиеся от старых источников данных */
 export function clearLegacyKeys(): void {
   for (const key of LEGACY_KEYS) removeKey(key)
 }
 
 export function getStratzApiKey(): string {
-  return getString(STORAGE_KEYS.stratzApiKey)
+  // Ранее сохранённый ключ (localStorage) приоритетнее ключа из env —
+  // оставлено для обратной совместимости с уже сохранёнными ключами.
+  return getString(STORAGE_KEYS.stratzApiKey) || getEnvStratzApiKey()
 }
 
-export function setStratzApiKey(value: string): void {
-  setString(STORAGE_KEYS.stratzApiKey, value)
+/**
+ * Общий fallback-ключ из окружения сборки (VITE_STRATZ_API_KEY).
+ * ВАЖНО: переменные VITE_* вшиваются в клиентский бандл и видны любому
+ * пользователю — используйте его только для локальной сборки/демо.
+ */
+export function getEnvStratzApiKey(): string {
+  return import.meta.env.VITE_STRATZ_API_KEY?.trim() ?? ''
 }
 
 function getString(key: string): string {
@@ -76,15 +62,5 @@ function getString(key: string): string {
     return localStorage.getItem(key) ?? ''
   } catch {
     return ''
-  }
-}
-
-function setString(key: string, value: string): void {
-  try {
-    const trimmed = value.trim()
-    if (trimmed) localStorage.setItem(key, trimmed)
-    else localStorage.removeItem(key)
-  } catch {
-    // ignore
   }
 }

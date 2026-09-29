@@ -281,13 +281,17 @@ export function applyMove(
   toIndex: number,
   respectRoles: boolean,
 ): BalanceResult {
+  // Работаем на копиях, чтобы не мутировать предыдущее состояние (React).
+  const teams = result.teams.map((team) => ({ ...team, players: [...team.players] }))
+
   let moved: BalancePlayer | null = null
-  const teams = result.teams.map((team) => {
-    const found = team.players.find((p) => p.accountId === accountId)
-    if (!found) return team
-    moved = found
-    return { ...team, players: team.players.filter((p) => p.accountId !== accountId) }
-  })
+  for (const team of teams) {
+    const index = team.players.findIndex((p) => p.accountId === accountId)
+    if (index >= 0) {
+      ;[moved] = team.players.splice(index, 1)
+      break
+    }
+  }
   if (!moved) return result
 
   const target = teams.find((team) => team.index === toIndex)
