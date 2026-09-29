@@ -53,6 +53,13 @@ function waitForStratzSlot(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, STRATZ_REQUEST_DELAY_MS))
 }
 
+function needsPositionRefresh(entry: StatsCacheEntry | undefined): boolean {
+  return Boolean(
+    entry?.stats.recentMatches.length &&
+      !entry.stats.recentMatches.some((match) => match.position != null),
+  )
+}
+
 export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = {}) {
   const [tracked, setTracked] = useState<TrackedPlayer[]>(() =>
     restoreTracked(),
@@ -162,9 +169,10 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
       void (async () => {
         for (const player of tracked) {
           const status = statusMapRef.current[player.accountId]
+          const cached = statsMapRef.current[player.accountId]
           if (!active) return
-          if (!statsMapRef.current[player.accountId] && (!status || status === 'idle')) {
-            await loadStats(player.accountId)
+          if ((!cached || needsPositionRefresh(cached)) && (!status || status === 'idle')) {
+            await loadStats(player.accountId, needsPositionRefresh(cached))
             await waitForStratzSlot()
           }
         }

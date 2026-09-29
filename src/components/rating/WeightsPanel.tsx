@@ -298,7 +298,7 @@ function RoleBenchmarks({ rated, config }: { rated: RatedPlayer[]; config: Ratin
                     </div>
                   </>
                 ) : (
-                  <div className="py-3 text-xs text-muted-foreground">Нет игрока с этим тегом</div>
+                  <div className="py-3 text-xs text-muted-foreground">Нет данных по позиции</div>
                 )}
               </div>
             )
