@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { fetchHeroes } from '@/api/opendota'
+import { fetchHeroes } from '@/api/stratz'
 import type { HeroInfo } from '@/types'
 
 // Кэш в памяти модуля: список героев почти не меняется

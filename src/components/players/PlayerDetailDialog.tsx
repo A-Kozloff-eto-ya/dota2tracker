@@ -32,8 +32,6 @@ interface PlayerDetailDialogProps {
   stats: PlayerStats | null
   heroes: Map<number, HeroInfo>
   config: RatingConfig
-  /** Подпись источника, из которого показаны данные */
-  sourceLabel?: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -44,7 +42,6 @@ export function PlayerDetailDialog({
   stats,
   heroes,
   config,
-  sourceLabel,
   open,
   onOpenChange,
 }: PlayerDetailDialogProps) {
@@ -91,11 +88,6 @@ export function PlayerDetailDialog({
                 )}
               </DialogTitle>
               <DialogDescription className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                {sourceLabel && (
-                  <span className="font-medium text-foreground/80">
-                    Источник: {sourceLabel}
-                  </span>
-                )}
                 <span className="inline-flex items-center gap-1.5">
                   <img
                     src={medal.iconUrl}
@@ -116,17 +108,6 @@ export function PlayerDetailDialog({
                 )}
               </DialogDescription>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <MiniLink
-                  href={
-                    profile?.profileurl ??
-                    `https://steamcommunity.com/profiles/${player.accountId}`
-                  }
-                  label="Steam"
-                />
-                <MiniLink
-                  href={`https://www.opendota.com/players/${player.accountId}`}
-                  label="OpenDota"
-                />
                 <MiniLink
                   href={`https://stratz.com/players/${player.accountId}`}
                   label="STRATZ"
@@ -169,8 +150,8 @@ export function PlayerDetailDialog({
           <Alert>
             <AlertTitle>Матч-история скрыта настройками приватности</AlertTitle>
             <AlertDescription className="text-xs leading-relaxed">
-              Игрок отключил публичные данные матчей в Dota 2 — история недоступна ни в
-              OpenDota, ни в STRATZ. Показаны только медаль и общие счётчики.
+              Игрок отключил публичные данные матчей в Dota 2 — история недоступна
+              в STRATZ. Показаны только медаль и общие счётчики.
             </AlertDescription>
           </Alert>
         )}
@@ -268,15 +249,6 @@ function MatchRow({
       </span>
       <span className="ml-auto text-xs tabular-nums text-muted-foreground">{duration}</span>
       <span className="flex shrink-0 items-center gap-1.5">
-        <a
-          href={`https://www.opendota.com/matches/${match.matchId}`}
-          target="_blank"
-          rel="noreferrer"
-          title="Открыть в OpenDota"
-          className="text-[10px] font-semibold text-muted-foreground transition-colors hover:text-primary"
-        >
-          OD
-        </a>
         <a
           href={`https://stratz.com/matches/${match.matchId}`}
           target="_blank"

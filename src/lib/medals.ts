@@ -1,5 +1,7 @@
 // Расшифровка rank_tier → медаль, звёзды, иконка
 // rank_tier = tier*10 + stars, где tier: 1 Herald .. 8 Immortal
+// Иконки лежат локально в public/rank_icons (снимок ассетов OpenDota:
+// медаль тира + оверлей со звёздами, уже скомпонованные в один PNG)
 
 export interface MedalInfo {
   tier: number // 0 — не калиброван
@@ -19,17 +21,17 @@ const MEDAL_NAMES: Record<number, string> = {
   8: 'Бессмертие',
 }
 
-const ICON_BASE = 'https://www.opendota.com/assets/images/dota2/rank_icons'
+const ICON_BASE = '/rank_icons'
 
 export function medalFromRankTier(rankTier: number | null | undefined): MedalInfo {
   if (rankTier == null || rankTier <= 0) {
-    return { tier: 0, stars: 0, label: 'Не калиброван', iconUrl: `${ICON_BASE}/rank_icon_0_0.svg` }
+    return { tier: 0, stars: 0, label: 'Не калиброван', iconUrl: `${ICON_BASE}/rank_icon_0_0.png` }
   }
   const tier = Math.min(8, Math.max(1, Math.floor(rankTier / 10)))
   const stars = tier >= 8 ? 0 : Math.min(5, Math.max(0, rankTier % 10))
   const base = MEDAL_NAMES[tier] ?? `Медаль ${tier}`
   const label = tier >= 8 ? base : `${base} ${stars}`
-  return { tier, stars, label, iconUrl: `${ICON_BASE}/rank_icon_${tier}_${stars}.svg` }
+  return { tier, stars, label, iconUrl: `${ICON_BASE}/rank_icon_${tier}_${stars}.png` }
 }
 
 export const ROLE_NAMES: Record<number, string> = {

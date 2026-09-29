@@ -1,6 +1,6 @@
 // Доменные типы Dota2Tracker
 
-export interface OpenDotaProfile {
+export interface PlayerProfile {
   accountId: number
   personaname: string
   /** Про-ник (если есть) */
@@ -11,10 +11,8 @@ export interface OpenDotaProfile {
   loccountrycode: string | null
   /** Публичная медаль: tier*10 + звёзды (например 80 = Immortal) */
   rankTier: number | null
-  /** Место в лидерборде (только Immortal) */
+  /** Место в лидерборде (только топ Immortal) */
   leaderboardRank: number | null
-  /** Оценка MMR от OpenDota */
-  computedMmr: number | null
 }
 
 export interface PlayerWl {
@@ -49,7 +47,7 @@ export interface RecentMatch {
 }
 
 export interface PlayerStats {
-  profile: OpenDotaProfile
+  profile: PlayerProfile
   wl: PlayerWl
   heroes: HeroPlayed[]
   recentMatches: RecentMatch[]
@@ -65,16 +63,6 @@ export interface TrackedPlayer {
 }
 
 export type PlayerStatus = 'idle' | 'loading' | 'loaded' | 'error'
-
-/** Идентификаторы источников данных игрока */
-export type StatsSourceId = 'steam' | 'opendota' | 'stratz'
-
-/** Данные игрока по всем источникам (каждый грузится и кэшируется отдельно) */
-export interface SourceBundle {
-  steam: PlayerStats | null
-  opendota: PlayerStats | null
-  stratz: PlayerStats | null
-}
 
 export interface RatingThresholds {
   /** KDA, который считается «идеальным» (даёт 100 очков шкалы) */
@@ -144,18 +132,13 @@ export interface RatedPlayer {
   /** Когда статистика была загружена (мс) */
   fetchedAt: number | null
   evaluation: PlayerEvaluation | null
-  /** Данные по источникам — для переключателя на карточке */
-  sources: SourceBundle
 }
-
-export type SearchSource = 'opendota' | 'stratz'
 
 export interface SearchEntry {
   accountId: number
   personaname: string
   avatarfull: string | null
   lastMatchTime: string | null
-  source: SearchSource
 }
 
 export type Role = 1 | 2 | 3 | 4 | 5
@@ -188,9 +171,6 @@ export interface BalanceResult {
 
 export interface HeroInfo {
   id: number
-  name: string
   localizedName: string
   img: string
-  primaryAttr: string
-  roles: string[]
 }

@@ -17,7 +17,7 @@ export function PlayerList({ rated, heroes, config, onRemove, onRefresh }: Playe
         <AlertTitle>Список пуст</AlertTitle>
         <AlertDescription>
           Найдите игрока по нику или добавьте по Steam ID / ссылке на профиль — рейтинг
-          посчитается автоматически из открытых данных OpenDota.
+          посчитается автоматически из данных STRATZ.
         </AlertDescription>
       </Alert>
     )

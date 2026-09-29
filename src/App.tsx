@@ -40,8 +40,6 @@ export default function App() {
           error: errorMap[player.accountId] ?? null,
           fetchedAt: entry?.fetchedAt ?? null,
           evaluation: evaluatePlayer(stats, config),
-          sources:
-            entry?.sources ?? { steam: null, opendota: stats, stratz: null },
         }
       }),
     [tracked, statsMap, statusMap, errorMap, config],
@@ -84,7 +82,7 @@ export default function App() {
           </main>
 
           <footer className="mx-auto max-w-6xl px-4 pb-8 pt-2 text-center text-xs text-muted-foreground">
-            Данные: OpenDota API · рейтинг вычисляется локально по настраиваемой формуле
+            Данные: STRATZ GraphQL API · рейтинг вычисляется локально по настраиваемой формуле
           </footer>
         </Tabs>
 

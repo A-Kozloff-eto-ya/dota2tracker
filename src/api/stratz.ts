@@ -1,15 +1,27 @@
-// Клиент STRATZ GraphQL API (основной источник данных о матчах/героях).
+// Клиент STRATZ GraphQL API — единственный источник данных приложения.
 // Ходит напрямую на api.stratz.com — у STRATZ есть CORS (access-control-allow-origin: *),
 // облачный фильтр пропускает запросы с браузерным клиентом.
-// Ключ: stratz.com → войти через Steam → страница API.
+// Ключ: stratz.com → страница API (JWT).
 
-import { steamId64FromAccount } from '@/api/steam'
-import { getStratzApiKey } from '@/lib/storage'
-import type { HeroPlayed, PlayerStats, RecentMatch, SearchEntry } from '@/types'
+import { steamId64FromAccount } from '@/lib/playerInput'
+import {
+  STORAGE_KEYS,
+  getStratzApiKey,
+  loadJSON,
+  saveJSON,
+} from '@/lib/storage'
+import type {
+  HeroInfo,
+  HeroPlayed,
+  PlayerStats,
+  RecentMatch,
+  SearchEntry,
+} from '@/types'
 
 const STRATZ_GRAPHQL = 'https://api.stratz.com/graphql'
 const MATCHES_TAKE = 50
 const HEROES_TAKE = 126
+const HEROES_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 export class StratzError extends Error {}
 
@@ -32,6 +44,8 @@ async function stratzQuery<T>(
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
+      // Локализованные названия героев (language { displayName })
+      'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
     },
     body: JSON.stringify({ query, variables }),
     signal: AbortSignal.timeout(15000),
@@ -60,7 +74,7 @@ async function stratzQuery<T>(
   return json.data
 }
 
-/** Поиск игроков по нику Steam-профиля (OpenDota ищет только по Dota-нику) */
+/** Поиск игроков по нику */
 export async function searchPlayersStratz(query: string, take = 8): Promise<SearchEntry[]> {
   const data = await stratzQuery<{
     stratz?: {
@@ -86,8 +100,77 @@ export async function searchPlayersStratz(query: string, take = 8): Promise<Sear
       personaname: p.name ?? `Игрок ${p.id}`,
       avatarfull: null,
       lastMatchTime: null,
-      source: 'stratz' as const,
     }))
+}
+
+// ---------- Справочник героев ----------
+
+/** Картинки героев лежат локально в public/heroes (снимок Valve CDN) */
+const HERO_IMG_BASE = '/heroes'
+/** Версия формата кэша героев — при изменении URL картинок нужно увеличить */
+const HEROES_CACHE_VERSION = 2
+
+interface HeroCacheBox {
+  t: number
+  v: number
+  data: HeroInfo[]
+}
+
+/**
+ * Список героев через константы STRATZ: id, название (с локализацией по
+ * Accept-Language) и картинка. Кэшируется в localStorage на неделю.
+ */
+export async function fetchHeroes(fresh = false): Promise<HeroInfo[]> {
+  const cacheKey = STORAGE_KEYS.heroes
+  if (!fresh) {
+    const box = loadJSON<HeroCacheBox | null>(cacheKey, null)
+    if (
+      box &&
+      box.v === HEROES_CACHE_VERSION &&
+      Date.now() - box.t < HEROES_TTL_MS
+    ) {
+      return box.data
+    }
+  }
+
+  const data = await stratzQuery<{
+    constants?: {
+      heroes?: Array<{
+        id?: number | null
+        name?: string | null
+        shortName?: string | null
+        displayName?: string | null
+        language?: { displayName?: string | null } | null
+      }> | null
+    } | null
+  }>(
+    `query {
+      constants {
+        heroes {
+          id
+          name
+          shortName
+          displayName
+          language { displayName }
+        }
+      }
+    }`,
+  )
+
+  const heroes: HeroInfo[] = (data.constants?.heroes ?? [])
+    .filter((h): h is { id: number; name: string | null; shortName?: string | null; displayName?: string | null; language?: { displayName?: string | null } | null } => typeof h.id === 'number')
+    .map((h) => {
+      const slug =
+        h.shortName || (h.name ? h.name.replace(/^npc_dota_hero_/, '') : '')
+      return {
+        id: h.id,
+        localizedName: h.language?.displayName || h.displayName || `Герой ${h.id}`,
+        img: slug ? `${HERO_IMG_BASE}/${slug}.png` : '',
+      }
+    })
+
+  saveJSON(cacheKey, { t: Date.now(), v: HEROES_CACHE_VERSION, data: heroes })
+  return heroes
 }
 
 // ---------- Полная статистика игрока из STRATZ ----------
@@ -101,6 +184,7 @@ interface StratzPlayerResponse {
     name?: string | null
     avatar?: string | null
     countryCode?: string | null
+    seasonLeaderboardRank?: number | null
   } | null
   heroesPerformance?: Array<{
     heroId?: number | null
@@ -149,7 +233,7 @@ const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!) {
     winCount
     behaviorScore
     ranks { rank asOfDateTime }
-    steamAccount { name avatar countryCode }
+    steamAccount { name avatar countryCode seasonLeaderboardRank }
     heroesPerformance(take: ${HEROES_TAKE}) { heroId winCount matchCount }
     matches(request: { take: $take }) {
       id
@@ -176,9 +260,9 @@ const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!) {
 }`
 
 /**
- * Полная статистика игрока из STRATZ — основного источника данных.
- * Формат результата идентичен OpenDota-клиенту, поэтому формула рейтинга
- * и балансировка работают без изменений.
+ * Полная статистика игрока из STRATZ — единственного источника данных.
+ * Формат результата универсален, поэтому формула рейтинга и балансировка
+ * работают без изменений.
  */
 export async function fetchPlayerStatsStratz(
   accountId: number,
@@ -196,7 +280,7 @@ export async function fetchPlayerStatsStratz(
   const matchCount = player.matchCount ?? 0
   const winCount = player.winCount ?? 0
 
-  // Свежайший ранк по дате; кодировка rank_tier совпадает с OpenDota (tier*10 + звёзды)
+  // Свежайший ранк по дате; кодировка совпадает с rank_tier (tier*10 + звёзды)
   let rankTier: number | null = null
   let rankAsOf = -1
   for (const entry of player.ranks ?? []) {
@@ -234,7 +318,7 @@ export async function fetchPlayerStatsStratz(
         towerDamage: pm?.towerDamage ?? 0,
         lastHits: pm?.numLastHits ?? 0,
         radiantWin: m.didRadiantWin === true,
-        // OpenDota-семантика слота: radiant 0..4, dire 128..132 (важно для формулы)
+        // Семантика слота: radiant 0..4, dire 128..132 (важно для формулы)
         playerSlot: pm?.isRadiant ? 0 : 128,
         gameMode: 0,
         leaverStatus: mapLeaverStatus(pm?.leaverStatus),
@@ -243,6 +327,7 @@ export async function fetchPlayerStatsStratz(
     .filter((m) => m.heroId > 0)
 
   const steam64 = steamId64FromAccount(accountId)
+  const leaderboardRank = player.steamAccount?.seasonLeaderboardRank
 
   return {
     profile: {
@@ -254,8 +339,7 @@ export async function fetchPlayerStatsStratz(
       profileurl: `https://steamcommunity.com/profiles/${steam64}`,
       loccountrycode: player.steamAccount?.countryCode ?? null,
       rankTier,
-      leaderboardRank: null,
-      computedMmr: null,
+      leaderboardRank: typeof leaderboardRank === 'number' && leaderboardRank > 0 ? leaderboardRank : null,
     },
     wl: { win: winCount, lose: Math.max(0, matchCount - winCount) },
     heroes,

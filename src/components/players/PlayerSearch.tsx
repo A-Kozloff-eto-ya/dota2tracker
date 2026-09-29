@@ -2,10 +2,8 @@ import { Check, Loader2, Search, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-import { searchPlayers } from '@/api/opendota'
-import { parsePlayerInput, resolveVanity } from '@/api/steam'
 import { searchPlayersStratz } from '@/api/stratz'
-import { getStratzApiKey } from '@/lib/storage'
+import { parsePlayerInput } from '@/lib/playerInput'
 import type { SearchEntry } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -67,76 +65,23 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
       return
     }
 
-    if (parsed.kind === 'vanity') {
-      await handleVanity(parsed.vanity)
-      return
-    }
-
     setParsedHint(parsed.hint)
     await searchByNickname(parsed.query)
   }
 
-  /** Ссылка steamcommunity.com/id/<vanity>: резолвим в account_id (Steam Web API
-   *  при наличии ключа, иначе публичный XML-профиль) и добавляем игрока */
-  async function handleVanity(vanity: string) {
-    setParsedHint('Резолвим vanity-адрес Steam…')
-    setSearching(true)
-    try {
-      const accountId = await resolveVanity(vanity)
-      if (accountId == null) {
-        setParsedHint('Vanity-адрес Steam (/id/)')
-        toast.info('Steam не нашёл профиль с таким адресом')
-        return
-      }
-      await handleAdd(accountId)
-      setValue('')
-      setResults([])
-      return
-    } catch (error) {
-      setParsedHint('Vanity-адрес Steam (/id/)')
-      toast.error(error instanceof Error ? error.message : 'Ошибка резолва vanity-адреса')
-      return
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  /** Параллельный поиск: OpenDota (Dota-ники) + STRATZ (Steam-ники), с дедупликацией */
+  /** Поиск по нику через STRATZ GraphQL `search` */
   async function searchByNickname(query: string) {
     setSearching(true)
     try {
-      const hasStratz = getStratzApiKey() !== ''
-      const [odSettled, stratzSettled] = await Promise.allSettled([
-        searchPlayers(query),
-        hasStratz ? searchPlayersStratz(query) : Promise.resolve<SearchEntry[]>([]),
-      ])
+      const found = await searchPlayersStratz(query)
+      setResults(found.slice(0, 12))
 
-      const odList = odSettled.status === 'fulfilled' ? odSettled.value : []
-      const stratzList = stratzSettled.status === 'fulfilled' ? stratzSettled.value : []
-
-      if (odSettled.status === 'rejected') {
-        toast.error(
-          odSettled.reason instanceof Error ? odSettled.reason.message : 'Ошибка поиска OpenDota',
-        )
-      } else if (hasStratz && stratzSettled.status === 'rejected') {
-        toast.warning(
-          stratzSettled.reason instanceof Error
-            ? stratzSettled.reason.message
-            : 'Поиск STRATZ не удался',
-        )
-      }
-
-      const merged: SearchEntry[] = [...odList]
-      for (const entry of stratzList) {
-        if (!merged.some((existing) => existing.accountId === entry.accountId)) {
-          merged.push(entry)
-        }
-      }
-      setResults(merged.slice(0, 12))
-
-      if (merged.length === 0) {
+      if (found.length === 0) {
         toast.info('Никого не нашли. Попробуйте точный Steam ID или ссылку на профиль.')
       }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Ошибка поиска STRATZ')
+      setResults([])
     } finally {
       setSearching(false)
     }
@@ -150,7 +95,7 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
           Добавить игрока
         </CardTitle>
         <CardDescription>
-          Ник, account_id, SteamID64, SteamID3 или ссылка на профиль Steam
+          Ник, account_id, SteamID64 или SteamID3
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -208,9 +153,6 @@ export function PlayerSearch({ onAdd }: PlayerSearchProps) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-sm font-medium">{entry.personaname}</span>
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
-                        {entry.source === 'stratz' ? 'STRATZ' : 'OpenDota'}
-                      </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       ID {entry.accountId.toLocaleString('ru-RU')}

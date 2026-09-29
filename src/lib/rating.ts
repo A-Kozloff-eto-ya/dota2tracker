@@ -31,9 +31,9 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 const toScore = (value: number, good: number) => clamp01(value / good) * 100
 const round1 = (x: number) => Math.round(x * 10) / 10
 
-/** TierScore: публичная медаль (rank_tier) + бонус лидерборда; fallback — оценка MMR */
+/** TierScore: публичная медаль (rank_tier) + бонус лидерборда */
 export function tierScoreOf(stats: PlayerStats): number | null {
-  const { rankTier, leaderboardRank, computedMmr } = stats.profile
+  const { rankTier, leaderboardRank } = stats.profile
   let score: number | null = null
 
   if (rankTier != null && rankTier > 0) {
@@ -51,9 +51,6 @@ export function tierScoreOf(stats: PlayerStats): number | null {
       const bonus = Math.max(0, 12 - 3 * Math.log10(Math.max(1, leaderboardRank)))
       score = Math.min(100, score + bonus)
     }
-  } else if (computedMmr != null && computedMmr > 0) {
-    // У приватных профилей медали нет — используем оценку MMR (максимум 90)
-    score = clamp01(computedMmr / 9000) * 90
   }
 
   return score == null ? null : round1(score)

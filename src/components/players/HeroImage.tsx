@@ -10,7 +10,7 @@ interface HeroImageProps {
   title?: string
 }
 
-/** Миниатюра героя с официального CDN Steam + фолбэк при ошибке загрузки */
+/** Миниатюра героя с CDN STRATZ + фолбэк при ошибке загрузки */
 export function HeroImage({ heroId, heroes, className, title }: HeroImageProps) {
   const [failed, setFailed] = useState(false)
   const hero = heroes?.get(heroId)

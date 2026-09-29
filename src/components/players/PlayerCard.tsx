@@ -11,7 +11,6 @@ import type {
   HeroInfo,
   RatedPlayer,
   RatingConfig,
-  StatsSourceId,
 } from '@/types'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -24,18 +23,6 @@ import { flagEmoji, fmtDecimal, fmtInt, fmtPct, timeAgo } from '@/lib/format'
 import { medalFromRankTier } from '@/lib/medals'
 import { cn } from '@/lib/utils'
 
-const SOURCE_TABS: Array<{ id: StatsSourceId; label: string }> = [
-  { id: 'stratz', label: 'STRATZ' },
-  { id: 'opendota', label: 'OpenDota' },
-  { id: 'steam', label: 'Steam' },
-]
-
-const SOURCE_LABEL: Record<StatsSourceId, string> = {
-  stratz: 'STRATZ',
-  opendota: 'OpenDota',
-  steam: 'Steam',
-}
-
 interface PlayerCardProps {
   rated: RatedPlayer
   heroes: Map<number, HeroInfo>
@@ -47,19 +34,8 @@ interface PlayerCardProps {
 export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: PlayerCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
-  const [sourceId, setSourceId] = useState<StatsSourceId>('stratz')
   const { player, status, error, fetchedAt } = rated
-  const sources = rated.sources
-
-  // Доступные источники; по умолчанию STRATZ, иначе первый с данными
-  const available: StatsSourceId[] = SOURCE_TABS.filter(
-    (tab) => sources[tab.id] != null,
-  ).map((tab) => tab.id)
-  const activeSource: StatsSourceId = available.includes(sourceId)
-    ? sourceId
-    : (available[0] ?? 'opendota')
-  // Статистика и рейтинг выбранного источника (объединённые — для команд)
-  const stats = sources[activeSource] ?? rated.stats
+  const stats = rated.stats
   const evaluation = useMemo(
     () => evaluatePlayer(stats, config),
     [stats, config],
@@ -82,8 +58,16 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
             type="button"
             onClick={() => setDetailOpen(true)}
             title="Открыть профиль и историю матчей"
-            className="cursor-pointer rounded-full transition-opacity hover:opacity-80"
+            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full transition-opacity hover:opacity-80"
           >
+            <img
+              src={medal.iconUrl}
+              alt=""
+              className="size-12 shrink-0"
+              onError={(event) => {
+                event.currentTarget.style.display = 'none'
+              }}
+            />
             {player.avatarfull ? (
               <img
                 src={player.avatarfull}
@@ -110,14 +94,6 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
               <div className="text-xs text-gold-bright">{profile.name}</div>
             )}
             <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <img
-                src={medal.iconUrl}
-                alt=""
-                className="h-4 w-auto"
-                onError={(event) => {
-                  event.currentTarget.style.display = 'none'
-                }}
-              />
               <span>{medal.label}</span>
               {isPrivate && (
                 <Badge variant="outline" className="text-[10px]">
@@ -129,46 +105,13 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
           <div className="text-right">
             <RatingBadge rating={evaluation?.rating ?? null} size="lg" />
             <div className="mt-1 text-[10px] text-muted-foreground">
-              {SOURCE_LABEL[activeSource]} · {timeAgo(fetchedAt)}
+              {timeAgo(fetchedAt)}
             </div>
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            Источник данных
-          </span>
-          <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-0.5">
-            {SOURCE_TABS.map((tab) => {
-              const has = sources[tab.id] != null
-              const isActive = activeSource === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  disabled={!has}
-                  onClick={() => setSourceId(tab.id)}
-                  title={
-                    has
-                      ? `Данные ${SOURCE_LABEL[tab.id]}`
-                      : `${SOURCE_LABEL[tab.id]}: нет данных (проверьте ключи в настройках)`
-                  }
-                  className={cn(
-                    'rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors',
-                    isActive && 'bg-primary text-primary-foreground shadow-sm',
-                    !isActive && has && 'text-muted-foreground hover:text-foreground',
-                    !has && 'cursor-not-allowed opacity-40',
-                  )}
-                >
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
         {status === 'error' && (
           <Alert variant="destructive">
             <AlertTitle>Ошибка загрузки</AlertTitle>
@@ -196,14 +139,10 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
           <Alert>
             <AlertTitle>Матч-история скрыта настройками приватности</AlertTitle>
             <AlertDescription className="text-xs leading-relaxed">
-              Игрок отключил публичные данные матчей в Dota 2, и OpenDota не имеет его
-              статистики — рейтинг рассчитан по медали
-              {profile?.computedMmr != null
-                ? `; оценка MMR по данным OpenDota: ~${fmtInt(profile.computedMmr)}`
-                : ''}
-              . Полная статистика появится автоматически, если игрок включит публичные
-              данные матчей (Dota 2 → Настройки → Приватность) и данные обновятся в
-              OpenDota.
+              Игрок отключил публичные данные матчей в Dota 2, и STRATZ не отдаёт его
+              статистику — рейтинг рассчитан по медали. Полная статистика появится
+              автоматически, если игрок включит публичные данные матчей
+              (Dota 2 → Настройки → Приватность) и данные обновятся.
             </AlertDescription>
           </Alert>
         )}
@@ -337,7 +276,6 @@ export function PlayerCard({ rated, heroes, config, onRemove, onRefresh }: Playe
         player={player}
         stats={stats}
         config={config}
-        sourceLabel={SOURCE_LABEL[activeSource]}
         heroes={heroes}
         open={detailOpen}
         onOpenChange={setDetailOpen}

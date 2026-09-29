@@ -3,13 +3,14 @@
 export const STORAGE_KEYS = {
   players: 'd2t.players',
   config: 'd2t.ratingConfig',
-  apiKey: 'd2t.apiKey',
-  steamApiKey: 'd2t.steamApiKey',
   stratzApiKey: 'd2t.stratzApiKey',
   heroes: 'd2t.heroesCache',
   stats: (id: number) => `d2t.stats.${id}`,
   cache: (path: string) => `d2t.cache.${path}`,
 } as const
+
+/** Ключи, оставшиеся от удалённых источников (OpenDota/Steam) — чистим при старте */
+const LEGACY_KEYS = ['d2t.apiKey', 'd2t.steamApiKey'] as const
 
 const CACHE_PREFIX = 'd2t.cache.'
 
@@ -57,20 +58,9 @@ export function clearApiCache(): number {
   return clearPrefixed(CACHE_PREFIX)
 }
 
-export function getApiKey(): string {
-  return getString(STORAGE_KEYS.apiKey)
-}
-
-export function setApiKey(value: string): void {
-  setString(STORAGE_KEYS.apiKey, value)
-}
-
-export function getSteamApiKey(): string {
-  return getString(STORAGE_KEYS.steamApiKey)
-}
-
-export function setSteamApiKey(value: string): void {
-  setString(STORAGE_KEYS.steamApiKey, value)
+/** Удалить ключи, оставшиеся от старых источников данных */
+export function clearLegacyKeys(): void {
+  for (const key of LEGACY_KEYS) removeKey(key)
 }
 
 export function getStratzApiKey(): string {
