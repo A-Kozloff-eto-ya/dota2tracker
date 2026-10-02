@@ -4,6 +4,8 @@ export const STORAGE_KEYS = {
   players: 'd2t.players',
   config: 'd2t.ratingConfig',
   heroes: 'd2t.heroesCache',
+  /** Выделенные в таблице ростера игроки (для распределения по командам) */
+  selection: 'd2t.selectedPlayers',
   stats: (id: number) => `d2t.stats.${id}`,
 } as const
 

@@ -20,6 +20,7 @@ import { flagEmoji, fmtInt, fmtPct, timeAgo } from '@/lib/format'
 import { medalFromRankTier } from '@/lib/medals'
 import type {
   HeroInfo,
+  PlayerEvaluation,
   PlayerStats,
   PoolBenchmarks,
   RatingConfig,
@@ -38,6 +39,9 @@ interface PlayerDetailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   roleFilter?: Role | null
+  /** Эффективная оценка (ручные переопределения + калибровка шкалы по якорям);
+   *  если не передана — считается по сырой формуле */
+  evaluation?: PlayerEvaluation | null
 }
 
 /** Полный профиль игрока: сводка, история матчей, топ героев, разбор рейтинга */
@@ -50,11 +54,15 @@ export function PlayerDetailDialog({
   open,
   onOpenChange,
   roleFilter = null,
+  evaluation: effectiveProp,
 }: PlayerDetailDialogProps) {
-  const evaluation = useMemo(
+  const rawEvaluation = useMemo(
     () => evaluatePlayer(stats, config, roleFilter, benchmarks),
     [stats, config, roleFilter, benchmarks],
   )
+  // Эффективная оценка из таблицы (ручные значения и калибровка шкалы),
+  // чтобы число в диалоге совпадало с таблицей и балансировкой
+  const evaluation = effectiveProp !== undefined ? effectiveProp : rawEvaluation
   const medal = medalFromRankTier(stats?.profile.rankTier ?? null)
   const profile = stats?.profile
   const totalGames = stats ? stats.wl.win + stats.wl.lose : 0

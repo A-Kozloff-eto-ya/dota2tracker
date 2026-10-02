@@ -52,7 +52,9 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
+  // popper вместо item-aligned: дропдаун позиционируется рядом с триггером,
+  // без прокрутки страницы к выбранному пункту (иначе контент «дёргается»)
+  position = "popper",
   align = "center",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {

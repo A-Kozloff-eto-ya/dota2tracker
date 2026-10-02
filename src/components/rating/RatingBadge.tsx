@@ -1,16 +1,8 @@
 import { animate, motion, useMotionValue, useTransform } from 'motion/react'
 import { useEffect } from 'react'
 
+import { ratingTierClass } from '@/lib/ratingTier'
 import { cn } from '@/lib/utils'
-
-const TIERS = [
-  { max: 2500, cls: 'text-slate-300' },
-  { max: 4000, cls: 'text-emerald-300' },
-  { max: 5500, cls: 'text-sky-300' },
-  { max: 7000, cls: 'text-violet-300' },
-  { max: 8500, cls: 'text-fuchsia-300' },
-  { max: Number.POSITIVE_INFINITY, cls: 'text-gold-gradient' },
-] as const
 
 const SIZES = { sm: 'text-lg', md: 'text-2xl', lg: 'text-4xl' } as const
 
@@ -47,11 +39,11 @@ export function RatingBadge({ rating, size = 'md', className }: RatingBadgeProps
     )
   }
 
-  const tier = TIERS.find((t) => rating < t.max) ?? TIERS[TIERS.length - 1]
+  const tier = ratingTierClass(rating)
 
   return (
     <motion.span
-      className={cn('font-display tabular-nums tracking-tight', SIZES[size], tier.cls, className)}
+      className={cn('font-display tabular-nums tracking-tight', SIZES[size], tier, className)}
       title={`Рейтинг: ${rating.toLocaleString('ru-RU')}`}
     >
       {text}

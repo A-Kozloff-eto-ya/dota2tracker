@@ -92,8 +92,8 @@ export function RatingBreakdown({ evaluation, config }: RatingBreakdownProps) {
           </p>
         )}
         <p className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
-          Рейтинг = Σ(вес × компонента) / Σвес, пересчитанный в шкалу 0–
-          {fmtInt(config.scaleMax)}. Доступные компоненты автоматически забирают вес недоступных.
+          Рейтинг = Σ(вес × компонента) / Σвес — целое число двузначной шкалы 1–100.
+          Доступные компоненты автоматически забирают вес недоступных.
           Форма скорится по{' '}
           {evaluation.thresholdsSource === 'pool'
             ? `эталонам пула (${config.benchmark.mode})`

@@ -71,6 +71,17 @@ export interface TrackedPlayer {
   avatarfull: string | null
   addedAt: number
   roles: PlayerRole[]
+  /** Ручные оценки (колонка players.rating_overrides); null — авторасчёт */
+  ratingOverrides?: RatingOverrides | null
+}
+
+/** Ручные переопределения оценок (1..100). Заданное значение главнее
+ *  авторасчёта; отсутствие поля или значения — считать по формуле. */
+export interface RatingOverrides {
+  /** Ручная общая оценка */
+  overall?: number
+  /** Ручные оценки по позициям 1..5 (в jsonb ключи приходят строками) */
+  roles?: Partial<Record<Role, number>>
 }
 
 export type PlayerRole = 'carry' | 'mid' | 'offlane' | 'soft_support' | 'hard_support'
@@ -159,8 +170,6 @@ export type ScoringSource = 'fixed' | 'pool'
 export interface RatingConfig {
   /** Веса компонент формулы (нормализуются автоматически) */
   weights: { tier: number; perf: number; activity: number }
-  /** Верхняя граница шкалы рейтинга (по умолчанию 10 000) */
-  scaleMax: number
   /** Сколько последних матчей брать для оценки формы */
   recentMatchesCount: number
   /** Окно актуальности матчей для формы и эталонов в месяцах
@@ -196,12 +205,12 @@ export interface ActivityDetails {
 }
 
 export interface PlayerEvaluation {
-  /** Итоговый рейтинг в диапазоне 0..scaleMax (null — недостаточно данных) */
+  /** Итоговый рейтинг — целое число двузначной шкалы 1..100 (null — недостаточно данных) */
   rating: number | null
   tierScore: number | null
   perfScore: number | null
   activityScore: number | null
-  /** Вклад каждой компоненты в итоговый рейтинг (в очках шкалы) */
+  /** Вклад каждой компоненты в итоговый рейтинг (в очках двузначной шкалы) */
   contributions: { tier: number | null; perf: number | null; activity: number | null }
   /** Какими порогами скорилась форма: фиксированными или эталонами пула */
   thresholdsSource: ScoringSource
@@ -219,7 +228,10 @@ export interface RatedPlayer {
   error: string | null
   /** Когда статистика была загружена (мс) */
   fetchedAt: number | null
+  /** Общая оценка (с учётом ручных переопределений и калибровки шкалы по якорям) */
   evaluation: PlayerEvaluation | null
+  /** Оценки по позициям 1..5 (с учётом ручных переопределений и калибровки шкалы) */
+  roleEvaluations: Record<Role, PlayerEvaluation | null>
 }
 
 export interface SearchEntry {

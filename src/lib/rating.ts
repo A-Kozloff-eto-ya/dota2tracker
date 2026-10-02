@@ -1,9 +1,10 @@
 // Формула персонального рейтинга
 //
-//   Rating = scaleMax · ( wTier·TierScore + wPerf·PerfScore + wAct·ActivityScore ) / Σw
+//   Rating = ( wTier·TierScore + wPerf·PerfScore + wAct·ActivityScore ) / Σw
 //
-// Все три компоненты — числа 0..100. Если какая-то компонента недоступна
-// (приватный профиль, нет матчей), её вес перераспределяется между остальными.
+// Итог округляется до целого числа двузначной шкалы 1..100. Все три компоненты —
+// числа 0..100. Если какая-то компонента недоступна (приватный профиль, нет
+// матчей), её вес перераспределяется между остальными.
 
 import type {
   ActivityDetails,
@@ -20,7 +21,6 @@ import type {
 
 export const DEFAULT_RATING_CONFIG: RatingConfig = {
   weights: { tier: 0.5, perf: 0.35, activity: 0.15 },
-  scaleMax: 10000,
   recentMatchesCount: 20,
   thresholds: {
     kda: 5,
@@ -263,11 +263,10 @@ export function evaluatePlayer(
     const weightSum = available.reduce((sum, p) => sum + p.weight, 0)
     const base =
       available.reduce((sum, p) => sum + (p.score as number) * p.weight, 0) / weightSum
-    rating = Math.round((base / 100) * config.scaleMax)
+    // Двузначная шкала: целое число 1..100 (даже нулевой результат даёт 1 очко)
+    rating = Math.min(100, Math.max(1, Math.round(base)))
     for (const p of available) {
-      contributions[p.key] = Math.round(
-        ((p.score as number) * p.weight) / weightSum / 100 * config.scaleMax,
-      )
+      contributions[p.key] = Math.round(((p.score as number) * p.weight) / weightSum)
     }
   }
 

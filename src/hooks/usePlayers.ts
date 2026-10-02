@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import { DEFAULT_STATS_PERIOD_MONTHS, fetchPlayerStatsStratz } from '@/api/stratz'
 import { supabase } from '@/lib/supabase'
 import { steamId64FromAccount } from '@/lib/playerInput'
+import {
+  sanitizeRatingOverrides,
+  type RatingOverrideScope,
+} from '@/lib/ratingOverrides'
 import {
   STORAGE_KEYS,
   loadJSON,
@@ -13,13 +18,21 @@ import type {
   PlayerStats,
   PlayerRole,
   PlayerStatus,
+  RatingOverrides,
   TrackedPlayer,
 } from '@/types'
+
+/** Колонки игроков из облака; rating_overrides запрашивается отдельно,
+ *  чтобы приложение работало и до добавления колонки в базе */
+const PLAYER_COLUMNS_BASE =
+  'account_id, personaname, avatar_url, roles, added_at, stats, stats_fetched_at'
+const PLAYER_COLUMNS = `${PLAYER_COLUMNS_BASE}, rating_overrides`
 
 function restoreTracked(): TrackedPlayer[] {
   return loadJSON<TrackedPlayer[]>(STORAGE_KEYS.players, []).map((player) => ({
     ...player,
     roles: player.roles ?? [],
+    ratingOverrides: sanitizeRatingOverrides(player.ratingOverrides ?? null),
   }))
 }
 
@@ -77,33 +90,60 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
 
   useEffect(() => {
     if (!supabase) return
+    const client = supabase
     let active = true
-    void supabase
-      .from('players')
-      .select('account_id, personaname, avatar_url, roles, added_at, stats, stats_fetched_at')
-      .order('personaname')
-      .then(({ data, error }) => {
-        if (!active || error) return
-        const cloudStats: Record<number, StatsCacheEntry> = {}
-        const cloudPlayers = data.map((player) => {
-          const accountId = Number(player.account_id)
-          if (player.stats && player.stats_fetched_at) {
-            cloudStats[accountId] = {
-              stats: player.stats as PlayerStats,
-              fetchedAt: new Date(player.stats_fetched_at).getTime(),
-            }
-          }
-          return {
-            accountId,
-            personaname: player.personaname,
-            avatarfull: player.avatar_url,
-            addedAt: new Date(player.added_at).getTime(),
-            roles: (player.roles ?? []) as PlayerRole[],
-          }
+
+    async function fetchCloudPlayers() {
+      let response = await client
+        .from('players')
+        .select(PLAYER_COLUMNS)
+        .order('personaname')
+      // Колонку rating_overrides могли ещё не добавить в базу — тогда
+      // работаем без неё и подсказываем, как добавить.
+      let overridesMissing = false
+      if (
+        response.error != null &&
+        /rating_overrides/.test(response.error.message) &&
+        /column/i.test(response.error.message)
+      ) {
+        overridesMissing = true
+        response = (await client
+          .from('players')
+          .select(PLAYER_COLUMNS_BASE)
+          .order('personaname')) as unknown as typeof response
+      }
+      const { data, error } = response
+      if (!active || error || data == null) return
+      if (overridesMissing) {
+        toast.warning('В базе нет колонки rating_overrides', {
+          description:
+            'Ручные оценки не сохранятся в облаке. Выполните в SQL-редакторе Supabase: ' +
+            'alter table public.players add column if not exists rating_overrides jsonb;',
         })
-        setTracked(cloudPlayers)
-        setStatsMap((prev) => ({ ...prev, ...cloudStats }))
+      }
+      const cloudStats: Record<number, StatsCacheEntry> = {}
+      const cloudPlayers = data.map((player) => {
+        const accountId = Number(player.account_id)
+        if (player.stats && player.stats_fetched_at) {
+          cloudStats[accountId] = {
+            stats: player.stats as PlayerStats,
+            fetchedAt: new Date(player.stats_fetched_at).getTime(),
+          }
+        }
+        return {
+          accountId,
+          personaname: player.personaname,
+          avatarfull: player.avatar_url,
+          addedAt: new Date(player.added_at).getTime(),
+          roles: (player.roles ?? []) as PlayerRole[],
+          ratingOverrides: sanitizeRatingOverrides(player.rating_overrides),
+        }
       })
+      setTracked(cloudPlayers)
+      setStatsMap((prev) => ({ ...prev, ...cloudStats }))
+    }
+
+    void fetchCloudPlayers()
     return () => { active = false }
   }, [userId])
 
@@ -261,6 +301,53 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
     [isAdmin, userId],
   )
 
+  /** Заменить все ручные оценки игрока. У админа — запись в облако
+   *  (players.rating_overrides), у гостя — локальное состояние, которое
+   *  и так персистится вместе со списком игроков. */
+  const setRatingOverrides = useCallback(
+    async (accountId: number, overrides: RatingOverrides | null): Promise<boolean> => {
+      if (userId && !isAdmin) return false
+      const clean = sanitizeRatingOverrides(overrides)
+      setTracked((prev) => prev.map((player) => (
+        player.accountId === accountId ? { ...player, ratingOverrides: clean } : player
+      )))
+      if (userId && supabase) {
+        const { error } = await supabase
+          .from('players')
+          .update({ rating_overrides: clean })
+          .eq('account_id', accountId)
+        if (error) {
+          toast.error(`Не удалось сохранить ручные оценки: ${error.message}`)
+          return false
+        }
+      }
+      return true
+    },
+    [isAdmin, userId],
+  )
+
+  /** Изменить одну оценку: 'overall' или позицию 1..5; value = null — сброс */
+  const setRatingOverride = useCallback(
+    async (accountId: number, scope: RatingOverrideScope, value: number | null): Promise<boolean> => {
+      const current = trackedRef.current.find(
+        (player) => player.accountId === accountId,
+      )?.ratingOverrides ?? null
+      const next: RatingOverrides = { ...(current ?? {}) }
+      if (scope === 'overall') {
+        if (value == null) delete next.overall
+        else next.overall = value
+      } else {
+        const roles = { ...(next.roles ?? {}) }
+        if (value == null) delete roles[scope]
+        else roles[scope] = value
+        if (Object.keys(roles).length > 0) next.roles = roles
+        else delete next.roles
+      }
+      return setRatingOverrides(accountId, next)
+    },
+    [setRatingOverrides],
+  )
+
   const refreshAll = useCallback(async (): Promise<{ updated: number; failed: number }> => {
     const players = [...trackedRef.current]
     let updated = 0
@@ -295,5 +382,6 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
     statsPeriodMonths,
     setStatsPeriodMonths,
     updatePlayerRoles,
+    setRatingOverride,
   }
 }

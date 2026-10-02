@@ -24,6 +24,7 @@ create table if not exists public.players (
 alter table public.players add column if not exists stats jsonb;
 alter table public.players add column if not exists stats_fetched_at timestamptz;
 alter table public.players add column if not exists roles text[] not null default '{}';
+alter table public.players add column if not exists rating_overrides jsonb;
 
 alter table public.users enable row level security;
 alter table public.players enable row level security;

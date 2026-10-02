@@ -123,6 +123,9 @@
     @apply bg-background text-foreground font-sans antialiased;
     min-width: 320px;
     overflow-x: hidden;
+    /* clip (в отличие от hidden) не создаёт scroll-контейнер —
+       position: sticky у шапки приложения и таблицы продолжает работать */
+    overflow-x: clip;
     background-color: var(--background);
     background-image:
       linear-gradient(var(--grid-line) 1px, transparent 1px),
@@ -182,5 +185,27 @@
   }
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  /* Таблица ростера: непрозрачные фоны строк — обязательны для «приклеенных»
+     колонок, иначе под ними просвечивает горизонтальный скролл */
+  .roster-row > td {
+    background: var(--card);
+  }
+  .roster-row:nth-child(even) > td {
+    background: color-mix(in srgb, var(--foreground) 3%, var(--card));
+  }
+  .roster-row:hover > td {
+    background: var(--surface-elevated);
+  }
+  .roster-row[data-selected='true'] > td {
+    background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  }
+  .roster-row[data-selected='true']:hover > td {
+    background: color-mix(in srgb, var(--primary) 18%, var(--card));
+  }
+  /* Строка эталонов пула под шапкой таблицы */
+  .roster-bench > td {
+    background: var(--muted);
   }
 }

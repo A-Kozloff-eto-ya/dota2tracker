@@ -52,16 +52,19 @@ const ALL_ROLES: Role[] = [1, 2, 3, 4, 5]
 
 interface TeamBuilderProps {
   rated: RatedPlayer[]
+  /** Выделенные в таблице ростера игроки (общее состояние с главной страницы) */
+  selected: Set<number>
+  onToggleSelected: (accountId: number) => void
+  onClearSelected: () => void
 }
 
-export function TeamBuilder({ rated }: TeamBuilderProps) {
+export function TeamBuilder({ rated, selected, onToggleSelected, onClearSelected }: TeamBuilderProps) {
   const available = useMemo(
     () => rated.filter((item) => item.evaluation?.rating != null),
     [rated],
   )
   const unavailable = rated.length - available.length
 
-  const [selected, setSelected] = useState<Set<number>>(new Set())
   // A value present in this map is an explicit per-setup override. Without
   // one, the first admin-assigned player tag is used as the default position.
   const [roleOverrides, setRoleOverrides] = useState<Record<number, Role | null>>({})
@@ -102,12 +105,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
   )
 
   function toggleSelect(accountId: number) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(accountId)) next.delete(accountId)
-      else next.add(accountId)
-      return next
-    })
+    onToggleSelected(accountId)
     setVariantIndex(0)
   }
 
@@ -304,7 +302,7 @@ export function TeamBuilder({ rated }: TeamBuilderProps) {
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  setSelected(new Set())
+                  onClearSelected()
                   setResult(null)
                   setVariantIndex(0)
                 }}

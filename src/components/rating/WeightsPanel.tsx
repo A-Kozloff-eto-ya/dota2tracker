@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -91,20 +90,6 @@ export function WeightsPanel({ config, onChange, onReset, rated, benchmarks }: W
           <Separator />
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="scale-max">Верхняя граница шкалы рейтинга</Label>
-              <Input
-                id="scale-max"
-                type="number"
-                min={1000}
-                max={50000}
-                step={500}
-                value={config.scaleMax}
-                onChange={(e) =>
-                  patch({ scaleMax: clampInt(e.target.value, 1000, 50000, config.scaleMax) })
-                }
-              />
-            </div>
             <div className="space-y-2">
               <Label>
                 Матчей для оценки формы: {config.recentMatchesCount}
@@ -623,10 +608,4 @@ function ThresholdSlider(props: {
       />
     </div>
   )
-}
-
-function clampInt(raw: string, min: number, max: number, fallback: number): number {
-  const value = Number(raw)
-  if (!Number.isFinite(value)) return fallback
-  return Math.min(max, Math.max(min, Math.round(value)))
 }
