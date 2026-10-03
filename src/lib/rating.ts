@@ -21,7 +21,7 @@ import type {
 
 export const DEFAULT_RATING_CONFIG: RatingConfig = {
   weights: { tier: 0.5, perf: 0.35, activity: 0.15 },
-  recentMatchesCount: 20,
+  recentMatchesCount: 15,
   thresholds: {
     kda: 5,
     gpm: 750,
@@ -35,6 +35,42 @@ export const DEFAULT_RATING_CONFIG: RatingConfig = {
   recencyMonths: 3,
 }
 
+/** Числовые id неклассических режимов Dota 2 (см. GameMode): Турбо, Ability
+ *  Draft, ARDM, Solo Mid. Аномальную статистику этих режимов не учитываем. */
+const NON_CLASSIC_MODE_IDS = new Set([18, 20, 21, 23])
+/** Официальный id Турбо-режима */
+const TURBO_MODE_ID = 23
+
+/** Матч проходит фильтр «классической» игры: не Турбо и не Ability Draft/ARDM. */
+export function isClassicMatch(match: RecentMatch): boolean {
+  if (match.isTurbo === true) return false
+  if (match.gameMode === TURBO_MODE_ID) return false
+  if (match.gameMode != null && NON_CLASSIC_MODE_IDS.has(match.gameMode)) return false
+  return true
+}
+
+/**
+ * Веса формулы с учётом приватности профиля.
+ *
+ * Приватный профиль в STRATZ: `rank_tier` публичен, но массив матчей пуст
+ * (или null). В этом случае Perf и Activity недоступны — весь вес уходит
+ * на TierScore, и игрок оценивается исключительно по медали.
+ */
+export function effectiveWeights(
+  recentMatches: RecentMatch[] | null | undefined,
+  weights: RatingConfig['weights'],
+): { tier: number; perf: number; activity: number } {
+  const hasMatches = Array.isArray(recentMatches) && recentMatches.length > 0
+  if (!hasMatches) {
+    return { tier: 1, perf: 0, activity: 0 }
+  }
+  return {
+    tier: Math.max(0, weights.tier),
+    perf: Math.max(0, weights.perf),
+    activity: Math.max(0, weights.activity),
+  }
+}
+
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 const toScore = (value: number, good: number) => clamp01(value / good) * 100
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -45,17 +81,22 @@ export function medalTierOf(rankTier: number | null | undefined): number | null 
   return Math.min(8, Math.max(1, Math.floor(rankTier / 10)))
 }
 
-/** Матчи для оценки формы и эталонов: без ливеров, при позиции — только на ней,
- * и не старше окна актуальности (recencyMonths, 0 — без ограничения). */
+/** Матчи для оценки формы и эталонов: без ливеров, без Турбо/Ability Draft,
+ * при позиции — только на ней, и не старше окна актуальности
+ * (recencyMonths, 0 — без ограничения). */
 export function positionMatches(
-  matches: RecentMatch[],
+  matches: RecentMatch[] | null | undefined,
   position?: Role | null,
   recencyMonths = 0,
   nowMs = Date.now(),
 ): RecentMatch[] {
+  if (!Array.isArray(matches)) return []
   const cutoffMs =
     recencyMonths > 0 ? nowMs - recencyMonths * 30 * 24 * 60 * 60 * 1000 : 0
   return matches
+    // Исключаем неклассические режимы (Турбо, Ability Draft, ARDM…):
+    // аномальная статистика не должна искажать рейтинг обычных 5v5.
+    .filter(isClassicMatch)
     // Исключаем ливеров: учитываем только матчи, где игрок доиграл
     // (0 NONE / 1 DISCONNECTED), отбрасывая DISCONNECTED_TOO_LONG,
     // ABANDONED, AFK и NEVER_CONNECTED.
@@ -121,8 +162,10 @@ export function tierScoreOf(stats: PlayerStats): number | null {
   return score == null ? null : round1(score)
 }
 
-/** PerfScore: агрегаты по последним матчам.
- * `poolThresholds` — пороги из эталонов пула (перекрывают фиксированные). */
+/** PerfScore: только относительные и командные метрики последних N матчей —
+ *  средний KDA ((K + A) / Max(1, D), kill'ы и assist'ы равнозначны) и винрейт.
+ *  Абсолютные GPM/XPM/DPM исключены: они дискриминируют саппортов (позиции 4/5).
+ *  `poolThresholds` — пороги из эталонов пула (перекрывают фиксированные). */
 export function perfOf(
   stats: PlayerStats,
   config: RatingConfig,
@@ -149,11 +192,11 @@ export function perfOf(
     kda: round1(agg.kda),
     kdaScore: round1(toScore(agg.kda, th.kda)),
     gpm: Math.round(agg.goldPerMin),
-    gpmScore: round1(toScore(agg.goldPerMin, th.gpm)),
+    gpmScore: null,
     xpm: Math.round(agg.xpPerMin),
-    xpmScore: round1(toScore(agg.xpPerMin, th.xpm)),
+    xpmScore: null,
     dpm: Math.round(agg.damagePerMin),
-    dpmScore: round1(toScore(agg.damagePerMin, th.dpm)),
+    dpmScore: null,
     recentWinrate: agg.winrate,
     recentWinrateScore: round1(agg.winrate * 100),
     sampleSize: agg.count,
@@ -193,7 +236,7 @@ export function activityOf(stats: PlayerStats, config: RatingConfig): ActivityDe
   }
 }
 
-const PERF_WEIGHTS = { kda: 0.3, gpm: 0.25, xpm: 0.15, dpm: 0.15, winrate: 0.15 } as const
+const PERF_WEIGHTS = { kda: 0.7, winrate: 0.3 } as const
 
 /** Полный расчёт рейтинга игрока.
  * `benchmarks` — эталоны пула: при scoring: 'pool' пороги формы берутся
@@ -210,12 +253,18 @@ export function evaluatePlayer(
   // должен играть в окне, иначе медаль и lifetime-винрейт тащат
   // «титана на пенсии» в топ на паре случайных матчей.
   const totalGames = stats.wl.win + stats.wl.lose
-  const isPrivate = totalGames === 0 && stats.recentMatches.length === 0
+  // Приватный профиль: rank_tier публичен, но матчи отсутствуют
+  // (пустой массив или null). Рейтинг строится только на медали.
+  const isPrivate =
+    totalGames === 0 &&
+    (!Array.isArray(stats.recentMatches) || stats.recentMatches.length === 0)
   const recentCount = positionMatches(
     stats.recentMatches,
     position,
     config.recencyMonths,
   ).length
+  // У приватного профиля нет данных о форме — флаг inactive не применяется,
+  // иначе медаль нельзя было бы оценить вовсе.
   const inactive = !isPrivate && recentCount < config.benchmark.minMatches
 
   const poolBench = config.scoring === 'pool' && benchmarks
@@ -229,9 +278,6 @@ export function evaluatePlayer(
     perf.sampleSize > 0 && perf.kdaScore != null
       ? round1(
           PERF_WEIGHTS.kda * perf.kdaScore +
-            PERF_WEIGHTS.gpm * (perf.gpmScore ?? 0) +
-            PERF_WEIGHTS.xpm * (perf.xpmScore ?? 0) +
-            PERF_WEIGHTS.dpm * (perf.dpmScore ?? 0) +
             PERF_WEIGHTS.winrate * (perf.recentWinrateScore ?? 0),
         )
       : null
@@ -245,10 +291,19 @@ export function evaluatePlayer(
   const activityScore =
     actWeight > 0 ? round1(actParts.reduce((sum, [w, v]) => sum + w * v, 0) / actWeight) : null
 
+  // Динамическое переопределение весов: приватный профиль → 100% Tier.
+  // Используем именно классические матчи после фильтров: если у игрока есть
+  // матчи, но все отфильтровались (например, только Турбо в окне), Perf
+  // недоступен — вес должен уйти в Tier, как у приватного профиля, иначе
+  // такой игрок получит rating=null, а скрытый — рейтинг (несимметрия).
+  const weights = effectiveWeights(
+    positionMatches(stats.recentMatches, position, config.recencyMonths),
+    config.weights,
+  )
   const parts: Array<{ key: 'tier' | 'perf' | 'activity'; score: number | null; weight: number }> = [
-    { key: 'tier', score: tier, weight: config.weights.tier },
-    { key: 'perf', score: perfScore, weight: config.weights.perf },
-    { key: 'activity', score: activityScore, weight: config.weights.activity },
+    { key: 'tier', score: tier, weight: weights.tier },
+    { key: 'perf', score: perfScore, weight: weights.perf },
+    { key: 'activity', score: activityScore, weight: weights.activity },
   ]
 
   const available = parts.filter((p) => p.score != null && p.weight > 0)

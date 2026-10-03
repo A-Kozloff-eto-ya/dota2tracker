@@ -3,6 +3,12 @@
 // Задача: разбить пул игроков на k команд так, чтобы средние рейтинги
 // команд были максимально близки (и, опционально, не дублировались роли).
 //
+// Гарантии:
+// - пул всегда сортируется по финальному рейтингу (от высшего к низшему)
+// - топ-2 игрока всегда разносятся в противоположные команды (Team A/B)
+// - при respectRoles в функцию качества добавлен штраф за концентрацию
+//   игроков одной роли в одной команде
+//
 // - k = 2 и n ≤ 18: гарантированно точный перебор разбиений
 // - иначе: снейк-драфт + локальная оптимизация обменами с рестартами
 
@@ -65,6 +71,38 @@ function assignRoles(
   }
 }
 
+/** Штраф за концентрацию одной роли в команде при respectRoles:
+ *  каждое «дублирование» роли внутри команды (сверх первой) стоит так же,
+ *  как единица violations, и умножается на ROLE_DUP_PENALTY. */
+const ROLE_DUP_PENALTY = 100
+
+/** Штраф за концентрацию топовых игроков («коров») в одной команде:
+ *  для каждой пары топ-N игроков, оказавшейся вместе, добавляется разрыв
+ *  их рейтингов — чем сильнее «коровы» соседствуют, тем хуже вариант. */
+function topPairPenalty(teams: BalancePlayer[][]): number {
+  const all = teams.flat().sort((a, b) => b.rating - a.rating)
+  const topCount = Math.min(4, all.length)
+  const top = all.slice(0, topCount)
+  let penalty = 0
+  for (let i = 0; i < top.length; i++) {
+    for (let j = i + 1; j < top.length; j++) {
+      if (teamIndexOf(teams, top[i]) === teamIndexOf(teams, top[j])) {
+        penalty += top[i].rating - top[j].rating + 1
+      }
+    }
+  }
+  return penalty
+}
+
+function teamIndexOf(teams: BalancePlayer[][], player: BalancePlayer): number {
+  return teams.findIndex((team) => team.some((p) => p.accountId === player.accountId))
+}
+
+/** Число игроков одной и той же роли внутри одной команды (сверх первой). */
+function roleDuplicationCount(teams: BalancePlayer[][]): number {
+  return teams.reduce((sum, team) => sum + countRoleDuplicates(team), 0)
+}
+
 function rawScore(teams: BalancePlayer[][], respectRoles: boolean): number {
   const avgs = teams.map(
     (players) =>
@@ -74,7 +112,31 @@ function rawScore(teams: BalancePlayer[][], respectRoles: boolean): number {
   const violations = respectRoles
     ? teams.reduce((sum, players) => sum + assignRoles(players, true).missing, 0)
     : 0
-  return spread + violations * 10000
+  // Топ-игроки не должны «стаяться» в одной команде, даже если средние равны
+  const topPenalty = topPairPenalty(teams)
+  // При учёте позиций — штраф за матчинг игроков одной роли в одной команде
+  const rolePenalty = respectRoles ? roleDuplicationCount(teams) * ROLE_DUP_PENALTY : 0
+  return spread + violations * 10000 + topPenalty + rolePenalty
+}
+
+/** Отсортировать пул по финальному рейтингу (от высшего к низшему) —
+ *  обязательный шаг перед драфтом/перебором. */
+function byRatingDesc(players: BalancePlayer[]): BalancePlayer[] {
+  return [...players].sort((a, b) => b.rating - a.rating)
+}
+
+/** Число дубликатов ролей внутри команды (сверх первой) — часть violations */
+export function countRoleDuplicates(team: BalancePlayer[]): number {
+  const counts = new Map<Role, number>()
+  for (const p of team) {
+    if (p.role == null) continue
+    counts.set(p.role, (counts.get(p.role) ?? 0) + 1)
+  }
+  let duplicates = 0
+  for (const count of counts.values()) {
+    if (count > 1) duplicates += count - 1
+  }
+  return duplicates
 }
 
 function popcount(x: number): number {
@@ -93,7 +155,11 @@ export function finalizeTeams(teams: BalanceTeam[], respectRoles: boolean): Bala
     const players = assignment.players
     const total = players.reduce((sum, p) => sum + p.rating, 0)
     const avg = players.length > 0 ? total / players.length : 0
-    const violations = respectRoles ? assignment.missing : 0
+    // violations включают и игроков без назначенной роли, и дубликаты ролей:
+    // раньше дубликаты не попадали в результат, и UI видел неполную картину
+    const violations = respectRoles
+      ? assignment.missing + countRoleDuplicates(players)
+      : 0
     return { ...team, players, total, avg, violations }
   })
   const avgs = finished.map((t) => t.avg)
@@ -108,20 +174,29 @@ function exactTwoTeams(
   respectRoles: boolean,
   variantIndex: number,
 ): BalanceResult {
-  const n = players.length
+  // Пул всегда отсортирован по рейтингу (от высшего к низшему)
+  const pool = byRatingDesc(players)
   const firstSize = sizes[0]
+  // Топ-2 игрока всегда разносятся в противоположные команды:
+  // №1 закреплён в Team A, №2 — в Team B.
+  const pinnedA = pool[0]
+  const pinnedB = pool.length > 1 ? pool[1] : null
+  const rest = pool.slice(pinnedB ? 2 : 1)
+  const restSize = firstSize - 1 // pinnedA уже в A
 
-  // Перебираем все разбиения (с дедупликацией по битам: первый игрок всегда
-  // в команде A — каждое неупорядоченное разбиение встречается ровно один раз)
+  // Перебираем разбиения остатка (с дедупликацией по битам: первый игрок
+  // остатка всегда в команде A — каждое неупорядоченное разбиение встречается
+  // ровно один раз)
   const candidates: Array<{ mask: number; score: number }> = []
-  for (let mask = 0; mask < 1 << n; mask++) {
-    if (popcount(mask) !== firstSize) continue
-    if ((mask & 1) === 0) continue
-    const teamA: BalancePlayer[] = []
-    const teamB: BalancePlayer[] = []
-    for (let i = 0; i < n; i++) {
-      if ((mask >> i) & 1) teamA.push(players[i])
-      else teamB.push(players[i])
+  const m = rest.length
+  for (let mask = 0; mask < 1 << m; mask++) {
+    if (popcount(mask) !== restSize) continue
+    if (m > 0 && (mask & 1) === 0) continue
+    const teamA: BalancePlayer[] = [pinnedA]
+    const teamB: BalancePlayer[] = pinnedB ? [pinnedB] : []
+    for (let i = 0; i < m; i++) {
+      if ((mask >> i) & 1) teamA.push(rest[i])
+      else teamB.push(rest[i])
     }
     candidates.push({ mask, score: rawScore([teamA, teamB], respectRoles) })
   }
@@ -132,11 +207,11 @@ function exactTwoTeams(
   candidates.sort((a, b) => a.score - b.score)
   const chosen = candidates[variantIndex % candidates.length]
 
-  const teamA: BalancePlayer[] = []
-  const teamB: BalancePlayer[] = []
-  for (let i = 0; i < n; i++) {
-    if ((chosen.mask >> i) & 1) teamA.push(players[i])
-    else teamB.push(players[i])
+  const teamA: BalancePlayer[] = [pinnedA]
+  const teamB: BalancePlayer[] = pinnedB ? [pinnedB] : []
+  for (let i = 0; i < m; i++) {
+    if ((chosen.mask >> i) & 1) teamA.push(rest[i])
+    else teamB.push(rest[i])
   }
   const result = finalizeTeams(
     [
@@ -161,8 +236,9 @@ function heuristic(
 
   for (let restart = 0; restart < restarts; restart++) {
     const rng = mulberry32(seed * 7919 + restart * 104729)
-    const pool = [...players]
-    pool.sort((a, b) => b.rating - a.rating + (rng() - 0.5) * 1e-3)
+    // Пул строго отсортирован по рейтингу: без случайного шума, чтобы топ-2
+    // гарантированно разошлись по противоположным командам на первом ходе.
+    const pool = byRatingDesc(players)
 
     const teams: BalanceTeam[] = sizes.map((size, index) => ({
       index,
@@ -185,8 +261,10 @@ function heuristic(
       }
     }
 
-    // Локальная оптимизация случайными обменами
-    for (let iter = 0; iter < 4000; iter++) {
+    // Локальная оптимизация случайными обменами. Обмены принимаются только
+    // при строгом улучшении, поэтому 1500 итераций почти не уступают 4000,
+    // но не блокируют main thread на секунды для больших пулов.
+    for (let iter = 0; iter < 1500; iter++) {
       const a = teams[Math.floor(rng() * k)]
       const b = teams[Math.floor(rng() * k)]
       if (a.index === b.index || a.players.length === 0 || b.players.length === 0) continue
@@ -240,7 +318,11 @@ function heuristic(
     }
   }
 
-  if (distinct.length === 0) return finalizeTeams([], respectRoles)
+  if (distinct.length === 0) {
+    // Сюда теоретически невозможно попасть (restarts > 0), но молчаливый
+    // возврат пустого разбиения с spread 0 проскочил бы как «валидный»
+    throw new Error('Не удалось построить разбиение команд')
+  }
 
   // Если рестарты сошлись к одному сетапу — для вариантов сверх найденных
   // генерируем детерминированные возмущения лучшего результата

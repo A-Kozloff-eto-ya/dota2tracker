@@ -38,6 +38,7 @@ import { Switch } from '@/components/ui/switch'
 import type { BalanceResult, RatedPlayer, Role } from '@/types'
 import { cn } from '@/lib/utils'
 import { PLAYER_ROLE_LABELS, preferredPosition } from '@/lib/playerRoles'
+import { DRAG_PLAYER_PREFIX, DRAG_TEAM_PREFIX } from '@/components/teams/TeamView'
 
 const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'any', label: 'Любая' },
@@ -49,6 +50,22 @@ const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
 ]
 
 const ALL_ROLES: Role[] = [1, 2, 3, 4, 5]
+
+/** Префиксы id DnD — единая точка правды с TeamView (импортируются) */
+
+/** Распарсить id из DragEndEvent; null — нераспознанный id */
+function parseDragId(activeId: string, overId: string): { accountId: number; toIndex: number } | null {
+  if (!activeId.startsWith(DRAG_PLAYER_PREFIX) || !overId.startsWith(DRAG_TEAM_PREFIX)) return null
+  const accountId = Number(activeId.slice(DRAG_PLAYER_PREFIX.length))
+  const toIndex = Number(overId.slice(DRAG_TEAM_PREFIX.length))
+  if (!Number.isFinite(accountId) || !Number.isFinite(toIndex)) return null
+  return { accountId, toIndex }
+}
+
+/** При учёте ролей в каждой команде должно быть ровно 5 игроков */
+function rolesRequirementMet(count: number, teams: number): boolean {
+  return count % teams === 0 && count / teams === 5
+}
 
 interface TeamBuilderProps {
   rated: RatedPlayer[]
@@ -121,10 +138,9 @@ export function TeamBuilder({ rated, selected, onToggleSelected, onClearSelected
 
   function handleDragEnd(event: DragEndEvent) {
     if (!result || !event.over) return
-    const accountId = Number(String(event.active.id).slice(2))
-    const toIndex = Number(String(event.over.id).replace('team-', ''))
-    if (!Number.isFinite(accountId) || !Number.isFinite(toIndex)) return
-    setResult(applyMove(result, accountId, toIndex, respectRoles))
+    const parsed = parseDragId(String(event.active.id), String(event.over.id))
+    if (!parsed) return
+    setResult(applyMove(result, parsed.accountId, parsed.toIndex, respectRoles))
   }
 
   if (available.length === 0) {
@@ -319,6 +335,13 @@ export function TeamBuilder({ rated, selected, onToggleSelected, onClearSelected
               Выбрано {selected.size} игроков — команды будут неравными (по{' '}
               {Math.floor(selected.size / teamCount)}–{Math.ceil(selected.size / teamCount)}{' '}
               человек).
+            </p>
+          )}
+
+          {respectRoles && selected.size > 0 && !rolesRequirementMet(selected.size, teamCount) && (
+            <p className="text-xs text-destructive">
+              При учёте ролей нужно ровно 5 игроков на команду — сейчас выбрано{' '}
+              {selected.size} при {teamCount} командах (нужно {teamCount * 5}).
             </p>
           )}
         </CardContent>

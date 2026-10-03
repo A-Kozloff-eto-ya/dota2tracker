@@ -1,8 +1,9 @@
-import { FileUp, RefreshCw, ShieldCheck, Trash2, Upload, UserRound } from 'lucide-react'
+import { FileUp, RefreshCw, RotateCw, ShieldCheck, Trash2, Upload, UserRound } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { resolveVanityAccountId } from '@/api/steam'
+import { retryPlayerStratz } from '@/api/stratz'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -36,11 +37,11 @@ interface AppUserRow {
 }
 
 const PLAYER_ROLE_OPTIONS: Array<{ value: PlayerRole; label: string }> = [
-  { value: 'carry', label: 'Керри' },
-  { value: 'mid', label: 'Мид' },
-  { value: 'offlane', label: 'Оффлейн' },
-  { value: 'soft_support', label: 'Софт-саппорт' },
-  { value: 'hard_support', label: 'Хард-саппорт' },
+  { value: 'carry', label: 'Carry' },
+  { value: 'mid', label: 'Mid' },
+  { value: 'offlane', label: 'Offlane' },
+  { value: 'soft_support', label: 'Soft Support' },
+  { value: 'hard_support', label: 'Hard Support' },
 ]
 
 export function AdminPanel({ players, onAdd, onRemove, onUpdateRoles, onRefreshAll }: AdminPanelProps) {
@@ -50,6 +51,7 @@ export function AdminPanel({ players, onAdd, onRemove, onUpdateRoles, onRefreshA
   const [users, setUsers] = useState<AppUserRow[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [refreshingAll, setRefreshingAll] = useState(false)
+  const [retryingAll, setRetryingAll] = useState(false)
   const [savingPlayer, setSavingPlayer] = useState<number | null>(null)
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set())
   const [deleteTargetIds, setDeleteTargetIds] = useState<number[]>([])
@@ -191,6 +193,45 @@ export function AdminPanel({ players, onAdd, onRemove, onUpdateRoles, onRefreshA
     toast.success(`Обновление завершено: ${result.updated} успешно, ${result.failed} ошибок`)
   }
 
+  /** Отправить все профили пула на перепарсинг в STRATZ (REST-ручка refresh).
+   *  Пауза между запросами — чтобы не упереться в rate-limit STRATZ. */
+  async function retryAllPlayers() {
+    if (retryingAll || players.length === 0) return
+    setRetryingAll(true)
+    let ok = 0
+    let failed = 0
+    try {
+      for (let i = 0; i < players.length; i++) {
+        try {
+          const success = await retryPlayerStratz(players[i].accountId)
+          if (success) ok += 1
+          else failed += 1
+        } catch {
+          failed += 1
+        }
+        if (i < players.length - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 350))
+        }
+      }
+      if (ok > 0) {
+        toast.success(`Перепарсинг запрошен: ${ok} успешно, ${failed} ошибок`, {
+          description: 'Данные обычно появляются через 1–5 минут — затем нажмите «Обновить всех».',
+        })
+      } else {
+        toast.error('Не удалось отправить запрос в STRATZ', {
+          description:
+            'Пожалуйста, попробуйте обновить профиль напрямую, зайдя на сайт stratz.com под своим аккаунтом Steam.',
+        })
+      }
+    } catch (error) {
+      toast.error('Не удалось отправить запрос в STRATZ', {
+        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+      })
+    } finally {
+      setRetryingAll(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card className="glass border-primary/30">
@@ -230,6 +271,16 @@ export function AdminPanel({ players, onAdd, onRemove, onUpdateRoles, onRefreshA
               <Button size="sm" variant="outline" onClick={() => void refreshAll()} disabled={refreshingAll || players.length === 0}>
                 <RefreshCw className={refreshingAll ? 'size-4 animate-spin' : 'size-4'} />
                 {refreshingAll ? 'Обновление...' : 'Обновить всех'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void retryAllPlayers()}
+                disabled={retryingAll || players.length === 0}
+                title="Отправить все профили на перепарсинг в STRATZ (retryPlayer) — для свежеоткрытых профилей"
+              >
+                <RotateCw className={retryingAll ? 'size-4 animate-spin' : 'size-4'} />
+                {retryingAll ? 'Перепарсинг...' : 'Перепарсинг в STRATZ'}
               </Button>
               <Button
                 size="sm"

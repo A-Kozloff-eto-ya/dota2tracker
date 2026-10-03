@@ -75,7 +75,7 @@ export async function searchPlayersStratz(query: string, take = 8): Promise<Sear
           players { id name }
         }
       }
-    }`,
+    }`.replace(/\n\s*/g, ' '),
     { query, take },
   )
   const players = data.stratz?.search?.players ?? []
@@ -182,6 +182,8 @@ interface StratzPlayerResponse {
     didRadiantWin?: boolean | null
     durationSeconds?: number | null
     startDateTime?: number | null
+    isTurbo?: boolean | null
+    gameMode?: string | number | null
     players?: Array<{
       playerSlot?: number | null
       isRadiant?: boolean | null
@@ -235,6 +237,27 @@ function mapPosition(value: unknown): Role | null {
   return match ? (Number(match[1]) as Role) : null
 }
 
+// Неклассические режимы STRATZ (GameMode enum) → числовые id Dota 2.
+// Нужны только для того, чтобы рейтинг не портили аномальные матчи.
+const STRATZ_GAME_MODE_IDS: Record<string, number> = {
+  GAME_MODE_ABILITY_DRAFT: 18,
+  GAME_MODE_ABILITY_DRAFT_1V1: 18,
+  GAME_MODE_ARDM: 20,
+  GAME_MODE_SOLO_MID: 21,
+  GAME_MODE_TURBO: 23,
+}
+
+function mapGameMode(value: unknown): number {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const mapped = STRATZ_GAME_MODE_IDS[value]
+    if (mapped != null) return mapped
+    const digits = /\d+/.exec(value)
+    if (digits) return Number(digits[0])
+  }
+  return 0
+}
+
 const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!, $from: Long!, $to: Long!) {
   player(steamAccountId: $id) {
     matchCount
@@ -248,6 +271,7 @@ const PLAYER_STATS_QUERY = `query ($id: Long!, $take: Int!, $from: Long!, $to: L
       didRadiantWin
       durationSeconds
       startDateTime
+      gameMode
       players(steamAccountId: $id) {
         playerSlot
         isRadiant
@@ -315,7 +339,7 @@ export async function fetchPlayerStatsStratz(
   const heroes: HeroPlayed[] = (player.heroesPerformance ?? [])
     .filter((h) => typeof h.heroId === 'number' && (h.matchCount ?? 0) > 0)
     .map((h) => ({
-      heroId: h.heroId as number,
+      heroId: typeof h.heroId === 'number' ? h.heroId : 0,
       games: h.matchCount ?? 0,
       win: h.winCount ?? 0,
     }))
@@ -326,7 +350,7 @@ export async function fetchPlayerStatsStratz(
     .map((m) => {
       const pm = m.players?.[0] ?? null
       return {
-        matchId: m.id as number,
+        matchId: typeof m.id === 'number' ? m.id : 0,
         heroId: pm?.heroId ?? 0,
         startTime: m.startDateTime ?? 0,
         duration: m.durationSeconds ?? 0,
@@ -351,7 +375,7 @@ export async function fetchPlayerStatsStratz(
         imp: pm?.imp ?? null,
         // Семантика слота: radiant 0..4, dire 128..132 (важно для формулы)
         playerSlot: pm?.isRadiant ? 0 : 128,
-        gameMode: 0,
+        gameMode: mapGameMode(m.gameMode),
         leaverStatus: mapLeaverStatus(pm?.leaverStatus),
       }
     })
@@ -378,4 +402,30 @@ export async function fetchPlayerStatsStratz(
     periodMonths,
     behaviorScore: player.behaviorScore ?? null,
   }
+}
+
+// ---------- Принудительное обновление игрока (REST-ручка перепарсинга) ----------
+
+interface RefreshPlayerResponse {
+  success?: boolean
+  error?: string
+}
+
+/**
+ * Попросить STRATZ перепарсить профиль через REST-ручку
+ * (POST /api/stratz/refresh → бэкенд перебирает известные endpoints).
+ * @returns true — запрос принят (2xx), иначе/при ошибке сети — false
+ */
+export async function retryPlayerStratz(accountId: number): Promise<boolean> {
+  const res = await fetch('/api/stratz/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ steamId: steamId64FromAccount(accountId) }),
+    signal: AbortSignal.timeout(20_000),
+  })
+  const data = (await res.json().catch(() => null)) as RefreshPlayerResponse | null
+  if (!res.ok) {
+    throw new StratzError(data?.error ?? `Ошибка запроса перепарсинга (${res.status})`)
+  }
+  return data?.success === true
 }

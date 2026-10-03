@@ -76,6 +76,25 @@ function needsStatsRefresh(entry: StatsCacheEntry | undefined, periodMonths: num
   )
 }
 
+/** Профиль старше этого возраста считается устаревшим и обновляется в фоне */
+const STALE_STATS_MS = 24 * 60 * 60 * 1000
+/** Задержка между фоновыми обновлениями (щадим лимиты STRATZ и Vercel) */
+const BACKGROUND_SYNC_DELAY_MS = 500
+/** Пауза перед стартом фоновой синхронизации после монтирования */
+const BACKGROUND_SYNC_START_DELAY_MS = 2000
+
+/**
+ * Устаревший профиль: пустой (Perf недоступен — ноль матчей, т.е. данные
+ * STRATZ ещё не пришли) либо не обновлялся дольше STALE_STATS_MS.
+ */
+export function isStaleStatsEntry(entry: StatsCacheEntry | undefined): boolean {
+  if (!entry) return true
+  const stats = entry.stats
+  const totalGames = stats.wl.win + stats.wl.lose
+  const isEmptyProfile = totalGames === 0 && stats.recentMatches.length === 0
+  return isEmptyProfile || Date.now() - entry.fetchedAt > STALE_STATS_MS
+}
+
 export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = {}) {
   const [tracked, setTracked] = useState<TrackedPlayer[]>(() =>
     restoreTracked(),
@@ -87,6 +106,8 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
   const trackedRef = useRef(tracked)
   const statsMapRef = useRef(statsMap)
   const statusMapRef = useRef(statusMap)
+  /** accountId-ы, статистика которых грузится прямо сейчас (guard от гонок) */
+  const loadStatsInFlight = useRef(new Set<number>())
 
   useEffect(() => {
     if (!supabase) return
@@ -107,10 +128,14 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
         /column/i.test(response.error.message)
       ) {
         overridesMissing = true
-        response = (await client
+        const fallback = await client
           .from('players')
           .select(PLAYER_COLUMNS_BASE)
-          .order('personaname')) as unknown as typeof response
+          .order('personaname')
+        response = {
+          data: fallback.data as typeof response.data,
+          error: fallback.error,
+        } as typeof response
       }
       const { data, error } = response
       if (!active || error || data == null) return
@@ -139,7 +164,11 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
           ratingOverrides: sanitizeRatingOverrides(player.rating_overrides),
         }
       })
-      setTracked(cloudPlayers)
+      // Мержим с локальным списком: гости могли добавить игроков до входа —
+      // полная замена молча теряла бы их записи.
+      const cloudIds = new Set(cloudPlayers.map((p) => p.accountId))
+      const localOnly = trackedRef.current.filter((p) => !cloudIds.has(p.accountId))
+      setTracked([...localOnly, ...cloudPlayers])
       setStatsMap((prev) => ({ ...prev, ...cloudStats }))
     }
 
@@ -161,6 +190,10 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
   }, [tracked, userId])
 
   const loadStats = useCallback(async (accountId: number, fresh = false): Promise<boolean> => {
+    // Guard от гонок: авто-загрузка, refreshAll и ручное обновление могут
+    // сработать одновременно — повторный запрос сжигает квоту STRATZ.
+    if (loadStatsInFlight.current.has(accountId)) return false
+    loadStatsInFlight.current.add(accountId)
     setStatusMap((prev) => ({ ...prev, [accountId]: 'loading' }))
     setErrorMap((prev) => ({ ...prev, [accountId]: null }))
     try {
@@ -181,13 +214,16 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
         ),
       )
       if (userId && isAdmin && supabase) {
+        const roles =
+          trackedRef.current.find((player) => player.accountId === accountId)?.roles ?? []
         const { error } = await supabase.from('players').upsert(
           {
             account_id: accountId,
             steam_id64: stats.profile.steamid ?? steamId64FromAccount(accountId),
             personaname: stats.profile.personaname || `Игрок ${accountId}`,
             avatar_url: stats.profile.avatarfull,
-            roles: trackedRef.current.find((player) => player.accountId === accountId)?.roles ?? [],
+            // Отдельный upsert только ролей, если listTracked ещё не обновился
+            roles,
             added_by: userId,
             stats,
             stats_fetched_at: new Date(entry.fetchedAt).toISOString(),
@@ -203,6 +239,8 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
       setErrorMap((prev) => ({ ...prev, [accountId]: message }))
       setStatusMap((prev) => ({ ...prev, [accountId]: 'error' }))
       return false
+    } finally {
+      loadStatsInFlight.current.delete(accountId)
     }
   }, [isAdmin, statsPeriodMonths, userId])
 
@@ -232,6 +270,44 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
       window.clearTimeout(task)
     }
   }, [statsPeriodMonths, tracked, userId])
+
+  /**
+   * Фоновая синхронизация устаревших профилей: раз за сессию (после загрузки
+   * списка из Supabase) тихо перезапрашиваем игроков, чьи данные пустые или
+   * старше 24 часов. UI не блокируется: таблица сразу показывает кэшированные
+   * из Supabase данные, ячейки обновляемых игроков мягко переходят в
+   * «loading» по мере продвижения очереди (по одному, с задержкой 500 мс).
+   */
+  const backgroundSyncAbort = useRef(false)
+  useEffect(() => {
+    if (!supabase || (userId != null && !isAdmin)) return
+    // Один прогон на монтирование списка; abort при размонтировании/рефетче
+    backgroundSyncAbort.current = false
+    const task = window.setTimeout(() => {
+      void (async () => {
+        const stale = tracked.filter(
+          (player) =>
+            !loadStatsInFlight.current.has(player.accountId) &&
+            isStaleStatsEntry(statsMapRef.current[player.accountId]),
+        )
+        for (let i = 0; i < stale.length; i++) {
+          if (!backgroundSyncAbort.current) {
+            await loadStats(stale[i].accountId, true)
+            if (i < stale.length - 1) {
+              await new Promise((resolve) => window.setTimeout(resolve, BACKGROUND_SYNC_DELAY_MS))
+            }
+          }
+        }
+      })()
+    }, BACKGROUND_SYNC_START_DELAY_MS)
+    return () => {
+      backgroundSyncAbort.current = true
+      window.clearTimeout(task)
+    }
+    // loadStats/statsMap/tracked намеренно не в зависимостях: синхронизация
+    // запускается один раз за сессию (список из Supabase уже загружен)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracked.length, isAdmin, userId])
 
   const addAccount = useCallback(
     async (accountId: number, personaname?: string, avatarfull?: string | null): Promise<boolean> => {
@@ -352,11 +428,14 @@ export function usePlayers({ userId = null, isAdmin = false }: PlayersOptions = 
     const players = [...trackedRef.current]
     let updated = 0
     let failed = 0
-    for (const player of players) {
-      const ok = await loadStats(player.accountId, true)
+    for (let i = 0; i < players.length; i++) {
+      // Повторный клик «Обновить всех» во время идущей загрузки не должен
+      // дублировать запросы — loadStats уже отсекает in-flight, здесь
+      // дополнительно не делаем лишнюю паузу после последнего игрока.
+      const ok = await loadStats(players[i].accountId, true)
       if (ok) updated += 1
       else failed += 1
-      await waitForStratzSlot()
+      if (i < players.length - 1) await waitForStratzSlot()
     }
     return { updated, failed }
   }, [loadStats])

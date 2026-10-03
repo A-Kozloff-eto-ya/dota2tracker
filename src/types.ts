@@ -44,6 +44,8 @@ export interface RecentMatch {
   playerSlot: number
   gameMode: number
   leaverStatus: number
+  /** STRATZ: матч в Турбо-режиме (исключается из оценки формы) */
+  isTurbo?: boolean | null
   position?: Role | null
   lane?: string | null
   role?: string | null

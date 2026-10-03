@@ -4,6 +4,7 @@ import {
   ArrowUpDown,
   Eraser,
   Eye,
+  Info,
   Loader2,
   Pencil,
   RefreshCw,
@@ -27,6 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { fmtDecimal, fmtInt, fmtPct, timeAgo } from '@/lib/format'
 import { medalFromRankTier } from '@/lib/medals'
 import { positionMatches } from '@/lib/rating'
@@ -355,6 +362,15 @@ export function PlayerTable({
   const [sort, setSort] = useState<SortState>({ key: 'rating', desc: true })
   const [detailId, setDetailId] = useState<number | null>(null)
 
+  /** Профиль считается «скрытым/несинхронизированным»: нет матчей и нет ошибок
+   *  загрузки — как раз кейс «только открыл профиль в Dota 2». */
+  function isStaleProfile(item: RatedPlayer): boolean {
+    if (item.status === 'loading' || item.error) return false
+    if (!item.stats) return false
+    const total = item.stats.wl.win + item.stats.wl.lose
+    return total === 0 && item.stats.recentMatches.length === 0
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return rated
@@ -631,6 +647,7 @@ export function PlayerTable({
               const isSelected = selected.has(accountId)
               const medal = medalFromRankTier(row.rank)
               const busy = item.status === 'loading'
+              const stale = isStaleProfile(item)
               const perf = item.evaluation?.perf
               return (
                 <tr
@@ -685,7 +702,7 @@ export function PlayerTable({
                     </button>
                   </td>
                   <td className={cn(CELL, 'w-[110px]')}>
-                    <div className="flex items-center gap-1.5" title={medal.label}>
+                    <div className="flex items-center gap-1.5">
                       <img
                         src={medal.iconUrl}
                         alt=""
@@ -695,6 +712,23 @@ export function PlayerTable({
                         }}
                       />
                       <span className="min-w-0 truncate text-[11px] text-muted-foreground">{medal.label}</span>
+                      {stale && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={-1} className="inline-flex text-gold-bright">
+                                <Info className="size-3.5 shrink-0" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-64 text-left leading-snug">
+                              Если вы только что открыли профиль в Dota 2, нажмите кнопку
+                              обновления (⟳). Также убедитесь, что включили пункт
+                              «Общедоступная история матчей» именно внутри настроек самой
+                              игры (вкладка «Сообщество»), а не только в приватности Steam.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
                   </td>
                   <td className={cn(CELL, 'w-[110px]')}>

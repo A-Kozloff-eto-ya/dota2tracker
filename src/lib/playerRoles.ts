@@ -1,11 +1,11 @@
 import type { PlayerRole, Role } from '@/types'
 
 export const PLAYER_ROLE_LABELS: Record<PlayerRole, string> = {
-  carry: 'Керри',
-  mid: 'Мид',
-  offlane: 'Оффлейн',
-  soft_support: 'Софт-саппорт',
-  hard_support: 'Хард-саппорт',
+  carry: 'Carry',
+  mid: 'Mid',
+  offlane: 'Offlane',
+  soft_support: 'Soft Support',
+  hard_support: 'Hard Support',
 }
 
 export const PLAYER_ROLE_POSITIONS: Record<PlayerRole, Role> = {

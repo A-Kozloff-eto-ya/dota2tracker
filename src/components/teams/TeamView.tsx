@@ -9,6 +9,10 @@ import { medalFromRankTier, ROLE_NAMES } from '@/lib/medals'
 import type { BalanceTeam, RatedPlayer, Role } from '@/types'
 import { cn } from '@/lib/utils'
 
+/** Префиксы id DnD — единая точка правды для TeamBuilder и TeamView */
+export const DRAG_PLAYER_PREFIX = 'p-'
+export const DRAG_TEAM_PREFIX = 'team-'
+
 interface TeamViewProps {
   team: BalanceTeam
   teamCount: number
@@ -19,7 +23,7 @@ interface TeamViewProps {
 /** Карточка команды: droppable-зона со списком draggable-игроков */
 export function TeamView({ team, teamCount, byId, showRoleWarnings }: TeamViewProps) {
   const style = teamStyle(team.index)
-  const { setNodeRef, isOver } = useDroppable({ id: `team-${team.index}` })
+  const { setNodeRef, isOver } = useDroppable({ id: `${DRAG_TEAM_PREFIX}${team.index}` })
 
   return (
     <Card
@@ -85,7 +89,7 @@ function DraggablePlayerRow(props: {
   byId: Map<number, RatedPlayer>
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `p-${props.accountId}`,
+    id: `${DRAG_PLAYER_PREFIX}${props.accountId}`,
   })
   const rated = props.byId.get(props.accountId)
   const medal = medalFromRankTier(rated?.stats?.profile.rankTier ?? null)
@@ -131,7 +135,7 @@ function DraggablePlayerRow(props: {
           {medal.label}
           {props.role != null && (
             <span className="ml-1 max-w-[9rem] truncate rounded bg-secondary px-1 py-px sm:max-w-none">
-              Поз. {props.role} · {ROLE_NAMES[props.role]}
+              Pos. {props.role} · {ROLE_NAMES[props.role]}
             </span>
           )}
         </div>

@@ -11,21 +11,21 @@ export interface MedalInfo {
 }
 
 const MEDAL_NAMES: Record<number, string> = {
-  1: 'Рекрут',
-  2: 'Страж',
-  3: 'Рыцарь',
-  4: 'Архонт',
-  5: 'Легенда',
-  6: 'Древний',
-  7: 'Божество',
-  8: 'Бессмертие',
+  1: 'Herald',
+  2: 'Guardian',
+  3: 'Crusader',
+  4: 'Archon',
+  5: 'Legend',
+  6: 'Ancient',
+  7: 'Divine',
+  8: 'Immortal',
 }
 
 const ICON_BASE = '/rank_icons'
 
 export function medalFromRankTier(rankTier: number | null | undefined): MedalInfo {
   if (rankTier == null || rankTier <= 0) {
-    return { tier: 0, stars: 0, label: 'Не калиброван', iconUrl: `${ICON_BASE}/rank_icon_0_0.png` }
+    return { tier: 0, stars: 0, label: 'Uncalibrated', iconUrl: `${ICON_BASE}/rank_icon_0_0.png` }
   }
   const tier = Math.min(8, Math.max(1, Math.floor(rankTier / 10)))
   const stars = tier >= 8 ? 0 : Math.min(5, Math.max(0, rankTier % 10))
@@ -35,9 +35,9 @@ export function medalFromRankTier(rankTier: number | null | undefined): MedalInf
 }
 
 export const ROLE_NAMES: Record<number, string> = {
-  1: 'Керри',
-  2: 'Мид',
-  3: 'Оффлейн',
-  4: 'Саппорт',
-  5: 'Хард-сап',
+  1: 'Carry',
+  2: 'Mid',
+  3: 'Offlane',
+  4: 'Support',
+  5: 'Hard Support',
 }
